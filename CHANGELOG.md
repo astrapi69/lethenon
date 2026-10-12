@@ -34,6 +34,12 @@ ADDED:
 
 FIXED:
 
+- the README called proof of pun "CPU-friendly on purpose" and gave it Monero's reasoning for RandomX,
+  "designed to make the use of mining-specific hardware unfeasible" (#186). Proof of pun is SHA-256
+  proof of work with the pun and a counter in place of a nonce; SHA-256 is not memory-hard and resists
+  neither GPUs nor mining-specific hardware, which RandomX does by design. The comparison is gone, and
+  the row says what the work function is. The same sentence said the "memo hash" had to carry a prefix;
+  it is the hash of the whole block, with a number of leading zero bits, as the specification says
 - a node keeps the most recent 100 refusals instead of every one (#183). The list grew with every
   refused connection, without a bound, and kept every refused remote address - personal data - for
   the node's whole run; a seed node runs for months. A running count is kept beside it,
