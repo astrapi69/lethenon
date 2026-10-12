@@ -332,7 +332,8 @@ it is not a permission.
 - **What a node keeps**: the addresses of its peers in memory, and passes on those of listening nodes
   to others - "running a node that listens publishes its address" (ADR 0003, "Peer exchange"). The
   refusals it prints when it stops name the remote addresses (`Node.refusals`, `NodeCommand`), and
-  under systemd they land in the journal.
+  under systemd they land in the journal. In memory it keeps only the most recent 100 refusals,
+  and counts the rest (#183).
 - **Limit and delete**: data are to be "limited to what is necessary" and "kept in a form which permits
   identification of data subjects for no longer than is necessary" (GDPR, Article 5(1)(c) and (e)). In
   practice: no log beyond the journal, and the journal kept short (`MaxRetentionSec=7day` in

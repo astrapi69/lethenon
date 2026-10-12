@@ -104,7 +104,7 @@ class DiscoveryTest
 			Socket ours = new Socket("127.0.0.1", server.getLocalPort());
 			Socket theirs = server.accept())
 		{
-			Discovery discovery = new Discovery(List.of(), new CopyOnWriteArrayList<>(), dialer,
+			Discovery discovery = new Discovery(List.of(), new Refusals(), dialer,
 				threads);
 			Peer peer = peerOver(ours);
 			peer.expectPeers();
@@ -173,7 +173,7 @@ class DiscoveryTest
 				return Set.of();
 			}
 		};
-		List<String> refusals = new CopyOnWriteArrayList<>();
+		Refusals refusals = new Refusals();
 		ExecutorService threads = Executors.newVirtualThreadPerTaskExecutor();
 		try (ServerSocket server = new ServerSocket(0);
 			Socket ours = new Socket("127.0.0.1", server.getLocalPort());
@@ -189,8 +189,8 @@ class DiscoveryTest
 			threads.awaitTermination(5, TimeUnit.SECONDS);
 			assertEquals(ending.keptInTheBook(), discovery.heardOf().contains(NEW),
 				"heard of afterwards: " + discovery.heardOf());
-			assertTrue(refusals.stream().anyMatch(reason -> reason.startsWith(NEW.toString())
-				&& reason.contains(ending.thrown().getMessage())), refusals.toString());
+			assertTrue(refusals.recent().stream().anyMatch(reason -> reason.startsWith(NEW.toString())
+				&& reason.contains(ending.thrown().getMessage())), refusals.recent().toString());
 		}
 		finally
 		{

@@ -100,7 +100,7 @@ public final class Node implements AutoCloseable
 	/** Held while a peer is checked against the others and added (#117) */
 	private final Object admitting = new Object();
 
-	private final List<String> refusals = new CopyOnWriteArrayList<>();
+	private final Refusals refusals = new Refusals();
 
 	private final List<Socket> open = new CopyOnWriteArrayList<>();
 
@@ -450,13 +450,24 @@ public final class Node implements AutoCloseable
 	}
 
 	/**
-	 * Why connections were refused, oldest first
+	 * Why connections were refused: the most recent {@value Refusals#KEPT}, oldest first (#183)
 	 *
 	 * @return a snapshot
 	 */
 	public List<String> refusals()
 	{
-		return List.copyOf(refusals);
+		return refusals.recent();
+	}
+
+	/**
+	 * How many connections were refused since the node started, also those whose reason is no
+	 * longer kept in {@link #refusals()}
+	 *
+	 * @return the count
+	 */
+	public long refusalCount()
+	{
+		return refusals.count();
 	}
 
 	/**

@@ -53,7 +53,7 @@ final class Gossip
 
 	private final List<Peer> peers;
 
-	private final List<String> refusals;
+	private final Refusals refusals;
 
 	private final Object writing = new Object();
 
@@ -74,7 +74,7 @@ final class Gossip
 	 *            peer exchange
 	 */
 	Gossip(final LocalChain local, final ChainFile file, final List<Peer> peers,
-		final List<String> refusals, final Discovery discovery)
+		final Refusals refusals, final Discovery discovery)
 	{
 		this.discovery = discovery;
 		this.local = local;
