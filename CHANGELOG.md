@@ -20,6 +20,12 @@ ADDED:
 
 FIXED:
 
+- a node keeps the most recent 100 refusals instead of every one (#183). The list grew with every
+  refused connection, without a bound, and kept every refused remote address - personal data - for
+  the node's whole run; a seed node runs for months. A running count is kept beside it,
+  `Node.refusalCount()`, which the status line of #149 now counts with, so that it does not stop
+  counting at the hundredth refusal. `Node.refusals()` returns the kept ones, oldest first, and the
+  stop report adds how many earlier ones were not kept. Measured in `RefusalsTest`
 - the library no longer names a command line option in its refusals (#135). An onion address
   reached without a proxy was refused with "give its SOCKS proxy with --proxy", which a caller of
   the library - mystic-crypt-ui's plugin, through `Sync.once`, `Handover.send` or

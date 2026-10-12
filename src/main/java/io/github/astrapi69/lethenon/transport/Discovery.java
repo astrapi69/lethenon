@@ -81,7 +81,7 @@ final class Discovery
 
 	private final List<Peer> peers;
 
-	private final List<String> refusals;
+	private final Refusals refusals;
 
 	private final Dialer dialer;
 
@@ -89,7 +89,7 @@ final class Discovery
 
 	private volatile boolean dialling = true;
 
-	Discovery(final List<Peer> peers, final List<String> refusals, final Dialer dialer,
+	Discovery(final List<Peer> peers, final Refusals refusals, final Dialer dialer,
 		final ExecutorService threads)
 	{
 		this.peers = peers;

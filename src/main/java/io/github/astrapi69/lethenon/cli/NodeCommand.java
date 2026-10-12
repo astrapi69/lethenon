@@ -182,6 +182,12 @@ class NodeCommand implements Callable<Integer>
 					+ (txProxy == null ? "" : ", " + node.anonymousPeers().size()
 						+ " anonymity peer(s)"));
 				node.refusals().forEach(System.err::println);
+				long notKept = node.refusalCount() - node.refusals().size();
+				if (notKept > 0)
+				{
+					System.err.println(notKept + " earlier refusal(s) were not kept, "
+						+ node.refusalCount() + " in all");
+				}
 			}
 			finally
 			{
@@ -229,7 +235,7 @@ class NodeCommand implements Callable<Integer>
 	 * repeated every minute would leave the journal's retention to decide how long it is kept
 	 * (#149); the stop report names them once
 	 */
-	private String statusLine(final Node node, final int refusalsReported, final Miner miner)
+	private String statusLine(final Node node, final long refusalsReported, final Miner miner)
 	{
 		List<BlockBody> chain = node.chain();
 		return "status: height " + (chain.size() - 1) + ", tip "
@@ -239,7 +245,7 @@ class NodeCommand implements Callable<Integer>
 			+ (txProxy == null ? "" : ", " + node.anonymousPeers().size() + " anonymity peer(s)")
 			+ ", " + node.pending().size() + " transfer(s) waiting"
 			+ (miner == null ? "" : ", mined " + miner.minedBlocks() + " block(s)") + ", "
-			+ (node.refusals().size() - refusalsReported) + " refusal(s) since the last line";
+			+ (node.refusalCount() - refusalsReported) + " refusal(s) since the last line";
 	}
 
 	/**
@@ -450,7 +456,7 @@ class NodeCommand implements Callable<Integer>
 			long interval = statusSeconds * 1_000_000_000L;
 			long deadline = seconds > 0 ? System.nanoTime() + seconds * 1_000_000_000L : 0L;
 			long nextLine = statusSeconds > 0 ? System.nanoTime() + interval : 0L;
-			int refusalsReported = 0;
+			long refusalsReported = 0L;
 			long wait;
 			while ((wait = millisUntil(System.nanoTime(), deadline, nextLine)) >= 0
 				&& !stop.await(wait))
@@ -458,7 +464,7 @@ class NodeCommand implements Callable<Integer>
 				if (nextLine != 0L && System.nanoTime() - nextLine >= 0)
 				{
 					out.println(statusLine(node, refusalsReported, miner));
-					refusalsReported = node.refusals().size();
+					refusalsReported = node.refusalCount();
 					nextLine += interval;
 				}
 			}
