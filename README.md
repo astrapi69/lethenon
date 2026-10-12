@@ -271,8 +271,10 @@ What a release consists of, in the order it is run (0.2.0 was the first one run 
    The candidate is deleted from `~/.m2` afterwards.
 3. **Nothing else is merged into `develop`** until the tag exists. At 0.2.0 a feature pull request was
    merged 28 seconds before the release, so the merge carried code the release had not checked; the
-   tag went on the release commit instead (astrapi69/mystic-crypt-ui#516 tracks a freeze that enforces
-   this).
+   tag went on the release commit instead. Since then the freeze is enforced: the required check
+   `release-freeze` is red on every other pull request into `develop` while a pull request from a
+   `release/*` branch is open, and a change that belongs to the release carries the label
+   `release-content` (astrapi69/mystic-crypt-ui#516).
 4. **Tag the release commit** with an annotated `RELEASE-X.Y.Z` and push the tag. The publish workflow
    uploads to the Central Portal, where the maintainer releases it. A pushed tag is never moved or
    deleted; a failed run is fixed on the branch and re-run.
