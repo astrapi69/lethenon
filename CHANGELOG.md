@@ -18,8 +18,30 @@ CHANGED:
   the pool, and why the derivation path `m/1984'` never changes (specification, section 2). The
   messaging guide also says how lethenon and its maintainer's books may refer to each other
 
+ADDED:
+
+- a running node prints a status line, once a minute by default (#149): its height, the hash of its
+  tip, the connected peers with the outgoing and incoming connections it holds, the anonymity
+  zone's peers where there is a zone, the waiting transfers, the blocks it mined, and how many
+  connections were refused since the last line. A seed node runs for months without stopping, and
+  until now said how it stood only in its stop line. The refusals are counted, not listed: a remote
+  address is personal data, and a line repeated every minute would leave the journal's retention to
+  decide how long it is kept; the stop report still names them, once. `--status-every <seconds>`
+  sets the interval, 0 turns the line off. `Node.outgoingConnections()` and
+  `Node.incomingConnections()` give the two counts to a library caller. Measured in
+  `NodeStatusLineTest`, with a timeout, because a wait that comes out as 0 milliseconds would let a
+  node's `--for` run forever
+
 FIXED:
 
+- the library no longer names a command line option in its refusals (#135). An onion address
+  reached without a proxy was refused with "give its SOCKS proxy with --proxy", which a caller of
+  the library - mystic-crypt-ui's plugin, through `Sync.once`, `Handover.send` or
+  `Bootstrap.genesisFrom` - has no option for. The library now says that the address is reached
+  only through Tor's SOCKS proxy and the connection has none; `sync` and `node` refuse an onion
+  `--peer` without a proxy themselves, before anything is dialled, and name their options:
+  `--proxy`, and for `node` also `--tx-proxy`. A node used to start and then fail to dial such a
+  peer; it now refuses to start. Measured in `ProxyTest` and `ProxyOnTheCommandLineTest`
 - a configured peer is dialled again (#128). A peer given with `--peer` that could not be reached,
   or whose connection ended, used to be gone for the rest of the run; with `--no-discovery`, or in
   the anonymity zone before an onion address was learnt, that could be every peer a node had. It is

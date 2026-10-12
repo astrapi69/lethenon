@@ -159,7 +159,10 @@ class ProxyTest
 		IOException refused = assertThrows(IOException.class,
 			() -> Outbound.DIRECT.open(PeerAddress.parse(ONION + ":18480"), 1_000));
 
-		assertTrue(refused.getMessage().contains("--proxy"), refused.getMessage());
+		assertTrue(refused.getMessage().contains("Tor") && refused.getMessage().contains("SOCKS proxy"),
+			refused.getMessage());
+		assertFalse(refused.getMessage().contains("--"),
+			"a library caller has no command line option to give (#135): " + refused.getMessage());
 	}
 
 	@Test

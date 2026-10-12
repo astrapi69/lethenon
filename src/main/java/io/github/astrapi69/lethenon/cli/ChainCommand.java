@@ -41,6 +41,7 @@ import io.github.astrapi69.lethenon.ChainRejected;
 import io.github.astrapi69.lethenon.SignedTransaction;
 import io.github.astrapi69.lethenon.Wallet;
 import io.github.astrapi69.lethenon.WalletFile;
+import io.github.astrapi69.lethenon.transport.PeerAddress;
 import picocli.CommandLine.Option;
 
 /**
@@ -251,6 +252,31 @@ abstract class ChainCommand implements Callable<Integer>
 	static String hex(final Bytes account)
 	{
 		return account.toString();
+	}
+
+	/**
+	 * Refuses an onion peer that no option of the command routes through Tor, naming those options.
+	 * The library refuses it as well, in words without an option, since its callers have none
+	 * (#135)
+	 *
+	 * @param peers
+	 *            the peers given on the command line
+	 * @param routed
+	 *            whether an option routes onion peers through Tor
+	 * @param options
+	 *            the options that would, as the message names them
+	 */
+	static void refuseAnOnionPeerWithoutTor(final List<PeerAddress> peers, final boolean routed,
+		final String options)
+	{
+		if (routed)
+		{
+			return;
+		}
+		peers.stream().filter(PeerAddress::isOnion).findFirst().ifPresent(onion -> {
+			throw new IllegalArgumentException("the onion address " + onion
+				+ " is reached only through Tor: give its SOCKS proxy with " + options);
+		});
 	}
 
 	static char[] firstLineOfStandardInput() throws IOException

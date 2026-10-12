@@ -120,6 +120,16 @@ class ProxyOnTheCommandLineTest extends AbstractCliTest
 	}
 
 	@Test
+	@DisplayName("node refuses an onion peer it has no proxy for, and names the options")
+	void aNodeWithAnOnionPeerAndNoProxy_isRefused()
+	{
+		assertEquals(1, run("", "node", "--chain", servedFile.toString(), "--listen", "0",
+			"--peer", ONION + ":18480", "--for", "1"), out);
+
+		assertTrue(err.contains("--proxy") && err.contains("--tx-proxy"), err);
+	}
+
+	@Test
 	@DisplayName("an onion peer without --proxy is refused with the reason, and nothing is written")
 	void anOnionPeerWithoutAProxy_isRefused() throws Exception
 	{

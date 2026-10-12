@@ -428,6 +428,28 @@ public final class Node implements AutoCloseable
 	}
 
 	/**
+	 * How many outgoing connections this node holds against its limit of
+	 * {@link #MAXIMUM_OUTGOING}, those still in their handshake included
+	 *
+	 * @return the count at this moment
+	 */
+	public int outgoingConnections()
+	{
+		return outgoing.get();
+	}
+
+	/**
+	 * How many incoming connections this node holds against its limit of
+	 * {@link #MAXIMUM_INCOMING}, those still in their handshake included
+	 *
+	 * @return the count at this moment
+	 */
+	public int incomingConnections()
+	{
+		return incoming.get();
+	}
+
+	/**
 	 * Why connections were refused, oldest first
 	 *
 	 * @return a snapshot

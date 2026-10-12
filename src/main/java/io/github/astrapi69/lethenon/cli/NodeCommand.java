@@ -36,6 +36,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import io.github.astrapi69.lethenon.BlockBody;
+import io.github.astrapi69.lethenon.Blocks;
 import io.github.astrapi69.lethenon.Bytes;
 import io.github.astrapi69.lethenon.Chain;
 import io.github.astrapi69.lethenon.ChainFile;
@@ -114,6 +115,11 @@ class NodeCommand implements Callable<Integer>
 		description = "stop after this many seconds; default: run until interrupted")
 	long seconds;
 
+	@Option(names = "--status-every", defaultValue = "60",
+		description = "print a status line every this many seconds, 0 for none; default: "
+			+ "${DEFAULT-VALUE}")
+	long statusSeconds;
+
 	/**
 	 * Creates the command; picocli instantiates it reflectively
 	 */
@@ -143,6 +149,8 @@ class NodeCommand implements Callable<Integer>
 			throw new IllegalArgumentException("--mine pays a wallet: name it with --wallet");
 		}
 		List<PeerAddress> addresses = peers.stream().map(PeerAddress::parse).toList();
+		ChainCommand.refuseAnOnionPeerWithoutTor(addresses, proxy != null || txProxy != null,
+			"--proxy, or with --tx-proxy for the anonymity zone");
 		Outbound outbound = proxy == null ? Outbound.DIRECT
 			: Outbound.through(PeerAddress.parse(proxy));
 		Bytes beneficiary = mine ? ChainCommand
@@ -167,7 +175,7 @@ class NodeCommand implements Callable<Integer>
 			Stop stop = Stop.onShutdown();
 			try
 			{
-				long minedBlocks = runUntilStopped(node, beneficiary, stop);
+				long minedBlocks = runUntilStopped(node, beneficiary, stop, out);
 				out.println("stopped at height " + (node.chain().size() - 1) + ", mined "
 					+ minedBlocks + " block(s), " + node.pending().size()
 					+ " transfer(s) waiting, " + node.peers().size() + " peer(s) connected"
@@ -181,6 +189,57 @@ class NodeCommand implements Callable<Integer>
 			}
 		}
 		return 0;
+	}
+
+	/**
+	 * How long to wait for a stop before the next status line or the end of --for, whichever comes
+	 * first, rounded up so that the wait ends at or after it
+	 *
+	 * @param now
+	 *            System.nanoTime
+	 * @param deadline
+	 *            the end of --for in System.nanoTime, 0 for none
+	 * @param nextLine
+	 *            when the next status line is due in System.nanoTime, 0 for none
+	 * @return the milliseconds, 0 for no limit, -1 when --for is over
+	 */
+	static long millisUntil(final long now, final long deadline, final long nextLine)
+	{
+		if (deadline != 0L && deadline - now <= 0)
+		{
+			return -1L;
+		}
+		long untilTheEnd = deadline == 0L ? 0L : millisRoundedUp(deadline - now);
+		long untilTheLine = nextLine == 0L ? 0L : millisRoundedUp(nextLine - now);
+		if (untilTheEnd == 0L || untilTheLine == 0L)
+		{
+			return Math.max(untilTheEnd, untilTheLine);
+		}
+		return Math.min(untilTheEnd, untilTheLine);
+	}
+
+	private static long millisRoundedUp(final long nanos)
+	{
+		return Math.max(1L, (nanos + 999_999L) / 1_000_000L);
+	}
+
+	/**
+	 * How the node stands: height, tip, peers, pool and the refusals since the last line, counted.
+	 * Their addresses are left out on purpose: a remote address is personal data, and a line
+	 * repeated every minute would leave the journal's retention to decide how long it is kept
+	 * (#149); the stop report names them once
+	 */
+	private String statusLine(final Node node, final int refusalsReported, final Miner miner)
+	{
+		List<BlockBody> chain = node.chain();
+		return "status: height " + (chain.size() - 1) + ", tip "
+			+ Blocks.hashOf(chain.get(chain.size() - 1)) + ", " + node.peers().size()
+			+ " peer(s) connected (" + node.outgoingConnections() + " outgoing, "
+			+ node.incomingConnections() + " incoming connection(s))"
+			+ (txProxy == null ? "" : ", " + node.anonymousPeers().size() + " anonymity peer(s)")
+			+ ", " + node.pending().size() + " transfer(s) waiting"
+			+ (miner == null ? "" : ", mined " + miner.minedBlocks() + " block(s)") + ", "
+			+ (node.refusals().size() - refusalsReported) + " refusal(s) since the last line";
 	}
 
 	/**
@@ -230,17 +289,16 @@ class NodeCommand implements Callable<Integer>
 		 *
 		 * @param millis
 		 *            the longest wait, 0 for no limit
+		 * @return whether a stop was asked for
 		 */
-		void await(final long millis) throws InterruptedException
+		boolean await(final long millis) throws InterruptedException
 		{
 			if (millis > 0)
 			{
-				requested.await(millis, TimeUnit.MILLISECONDS);
+				return requested.await(millis, TimeUnit.MILLISECONDS);
 			}
-			else
-			{
-				requested.await();
-			}
+			requested.await();
+			return true;
 		}
 
 		/** The stop line is printed: the hook has nothing left to wait for and is withdrawn */
@@ -383,12 +441,27 @@ class NodeCommand implements Callable<Integer>
 		throw new IOException("no peer gave a genesis block: " + String.join("; ", reasons));
 	}
 
-	private long runUntilStopped(final Node node, final Bytes beneficiary, final Stop stop)
+	private long runUntilStopped(final Node node, final Bytes beneficiary, final Stop stop,
+		final PrintStream out)
 	{
 		Miner miner = beneficiary == null ? null : Miner.start(node, beneficiary, pun);
 		try
 		{
-			stop.await(seconds * 1_000L);
+			long interval = statusSeconds * 1_000_000_000L;
+			long deadline = seconds > 0 ? System.nanoTime() + seconds * 1_000_000_000L : 0L;
+			long nextLine = statusSeconds > 0 ? System.nanoTime() + interval : 0L;
+			int refusalsReported = 0;
+			long wait;
+			while ((wait = millisUntil(System.nanoTime(), deadline, nextLine)) >= 0
+				&& !stop.await(wait))
+			{
+				if (nextLine != 0L && System.nanoTime() - nextLine >= 0)
+				{
+					out.println(statusLine(node, refusalsReported, miner));
+					refusalsReported = node.refusals().size();
+					nextLine += interval;
+				}
+			}
 		}
 		catch (InterruptedException interrupted)
 		{

@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 import io.github.astrapi69.lethenon.ChainFile;
@@ -87,6 +88,7 @@ class SyncCommand implements Callable<Integer>
 	private int run(final PrintStream out) throws IOException
 	{
 		PeerAddress address = PeerAddress.parse(peer);
+		ChainCommand.refuseAnOnionPeerWithoutTor(List.of(address), proxy != null, "--proxy");
 		Outbound outbound = proxy == null ? Outbound.DIRECT
 			: Outbound.through(PeerAddress.parse(proxy));
 		Sync.Synced synced = Sync.once(new ChainFile(chain), address, Duration.ofSeconds(seconds),

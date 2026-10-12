@@ -96,8 +96,8 @@ public final class Outbound
 	{
 		if (proxy == null && target.isOnion())
 		{
-			throw new IOException("the onion address " + target + " is reached only through Tor: "
-				+ "give its SOCKS proxy with --proxy");
+			throw new IOException("the onion address " + target + " is reached only through Tor, "
+				+ "so only through Tor's SOCKS proxy, and this connection has none");
 		}
 		Socket socket = proxy == null ? new Socket()
 			: new Socket(new Proxy(Proxy.Type.SOCKS,

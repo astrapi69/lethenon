@@ -293,8 +293,12 @@ it is not a permission.
   check reads nothing that the network does not publish anyway.
 - **Memory**: from the service manager, `systemctl show <service> -p MemoryCurrent`, against the
   `MemoryMax` of the unit.
-- **Peers**: not readable from a running node today. The node prints its connected peers only when it
-  stops (`NodeCommand.java`, the stop line); a status line while it runs is #149.
+- **Peers, and the rest of the node's state**: a running node prints a status line once a minute
+  (`--status-every`, `NodeCommand`, #149). It gives the height, the tip's hash, the connected peers
+  with the outgoing and incoming connections it holds, the anonymity zone's peers where there is a
+  zone, the waiting transfers, and the refusals since the last line. Under systemd the line lands in
+  the journal, where the operator's tools read it. A tip that differs from the monitoring copy's for
+  longer than a few blocks is a fork worth a look.
 - **Where warnings go**: e-mail or a push service, the operator's choice; the check runs where the
   operator is, not on the seed node, so a dead server cannot silence its own warning.
 
@@ -332,8 +336,8 @@ it is not a permission.
 - **Limit and delete**: data are to be "limited to what is necessary" and "kept in a form which permits
   identification of data subjects for no longer than is necessary" (GDPR, Article 5(1)(c) and (e)). In
   practice: no log beyond the journal, and the journal kept short (`MaxRetentionSec=7day` in
-  `journald.conf`, for example); no list of addresses written anywhere else. #149 asks for the
-  node's status line to count refusals rather than repeat their addresses.
+  `journald.conf`, for example); no list of addresses written anywhere else. The status line counts
+  refusals and names no address (#149); only the stop report names them, once.
 - **A privacy policy on the website**, with what Article 13 of the GDPR asks for: who runs the seed
   nodes, that they see and pass on IP addresses and why, how long the journal keeps them, the rights of
   the people concerned, and that the website itself is hosted by GitHub. Over Tor, a seed node's onion

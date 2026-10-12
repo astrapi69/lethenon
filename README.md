@@ -114,7 +114,9 @@ A node keeps its chain file and `<chain>.pending` up to date and owns them while
 `send --node` hands the transfer to the node that serves the file named by `--chain`. A node
 with an empty file takes the genesis block from the first peer that answers; everything after
 it is verified block by block. The longer chain by cumulative work wins, and a fork is followed
-up to 500 blocks deep.
+up to 500 blocks deep. While it runs, a node prints a status line once a minute (`--status-every`,
+0 for none): height, tip, peers, waiting transfers and the number of refusals, without their
+addresses.
 
 The chain is called Lethenon, from
 [Lethe](https://en.wikipedia.org/wiki/Lethe), the river of forgetting. The name is the aim, not a
@@ -280,8 +282,10 @@ What a release consists of, in the order it is run (0.2.0 was the first one run 
    The candidate is deleted from `~/.m2` afterwards.
 3. **Nothing else is merged into `develop`** until the tag exists. At 0.2.0 a feature pull request was
    merged 28 seconds before the release, so the merge carried code the release had not checked; the
-   tag went on the release commit instead (astrapi69/mystic-crypt-ui#516 tracks a freeze that enforces
-   this).
+   tag went on the release commit instead. Since then the freeze is enforced: the required check
+   `release-freeze` is red on every other pull request into `develop` while a pull request from a
+   `release/*` branch is open, and a change that belongs to the release carries the label
+   `release-content` (astrapi69/mystic-crypt-ui#516).
 4. **Tag the release commit** with an annotated `RELEASE-X.Y.Z` and push the tag. The publish workflow
    uploads to the Central Portal, where the maintainer releases it. A pushed tag is never moved or
    deleted; a failed run is fixed on the branch and re-run.
