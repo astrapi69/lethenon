@@ -9,7 +9,11 @@
 </div>
 
 A joke currency with a serious point: **a protest against the politics of surveillance**, made of
-the only argument software can actually make - a working demonstration.
+the only argument software can actually make - a working demonstration of what a currency can
+refuse. It never asks anybody for a balance, it hides the recipient of a payment to a published
+address, and its test network can run over Tor. It does not hide who pays or how much: the sender and the
+amount of every transfer are public on the chain, because no proven post-quantum way to hide them
+exists yet ([Privacy, and its honest label](#privacy-and-its-honest-label)).
 
 ## Status
 
@@ -24,9 +28,9 @@ the holder of the spend key can sign it. Remaining gaps are open issues. The pla
 in the issues: [#1](https://github.com/astrapi69/lethenon/issues/1) is the brainstorm with the
 reasoning, [#2](https://github.com/astrapi69/lethenon/issues/2) the cut into five milestones.
 
-The **library** is on Maven Central; the **chain** is not published and will not be - nobody can
-buy the coin, there is no pool and no listing, and a tradeable joke is a financial product with
-real losers.
+The **library** is on Maven Central; the **coin** is not sold and will not be - nobody can buy it,
+there is no liquidity pool and no listing, and a tradeable joke is a financial product with real
+losers.
 
 ```groovy
 implementation "io.github.astrapi69:lethenon:0.4.0"
@@ -56,7 +60,8 @@ lethenon balance --chain chain.lethenon --wallet w.wallet       # replays the ch
 
 `--to` names an account and the chain shows who was paid; `--to-address` names the published
 address that `wallet create` and `balance` print, and the transfer then goes to a one-time
-destination derived from it, so two payments to the same address have nothing visibly in common.
+destination derived from it, so two payments to the same address land on destinations that have
+nothing visibly in common. The sender and the amount are visible either way.
 `sweep` is the other end of that: it moves what was paid to those destinations onto the account,
 one transfer per destination, and says out loud what that costs - the chain then shows those
 destinations and the account together. Receiving is unlinkable; spending is the moment that ends.
@@ -114,13 +119,15 @@ up to 500 blocks deep. While it runs, a node prints a status line once a minute 
 addresses.
 
 The chain is called Lethenon, from
-[Lethe](https://en.wikipedia.org/wiki/Lethe), the river of forgetting - the opposite of a permanent
-record about people. The name was checked against GitHub, Maven Central, npm, PyPI, crates.io and
+[Lethe](https://en.wikipedia.org/wiki/Lethe), the river of forgetting. The name is the aim, not a
+description: the chain is a permanent record like any other, and it keeps the sender and the amount
+of every transfer. The name was checked against GitHub, Maven Central, npm, PyPI, crates.io and
 the coin listings before it was picked, because a name collision is cheaper to avoid than to fix.
 
 ## What it is not
 
-**Lethenon stays private. Nobody can buy it, there is no pool, no listing, no promotion, no sale.**
+**Lethenon is not traded. Nobody can buy it, there is no liquidity pool, no listing, no promotion,
+no sale.**
 The moment a joke currency becomes tradeable it is a financial product with real losers, and in the
 European Union it falls under MiCA. Nothing about the point of this project depends on that, so it
 does not happen. If you found your way here expecting an investment, there is nothing here for you,
@@ -131,10 +138,13 @@ and that is deliberate.
 - **Verification without an observer.** Anybody can replay the chain and check every signature and
   every state transition themselves. Nothing has to be taken on trust from a central party, and the
   check itself requires no identity.
-- **Post-quantum from the first block.** "Harvest now, decrypt later" - record today's traffic and
-  break it when the machine exists - is a surveillance practice, not a theory. ML-DSA-65 signatures
-  (FIPS 204) answer it directly. Measured with OpenSSL 3.5.5: an Ed25519 signature is 64 bytes, an
-  ML-DSA-65 signature 3309 - the cost of the answer, stated rather than hidden.
+- **Post-quantum signatures from the first block.** A chain keeps its public keys for good, and a
+  quantum computer that can forge today's signatures could spend what is not its own. ML-DSA-65
+  (FIPS 204) can sign any transfer from block 0; the default is Ed25519, which is not post-quantum.
+  Measured with OpenSSL 3.5.5: an Ed25519 signature is 64 bytes, an ML-DSA-65 signature 3309 - the
+  cost of the answer, stated rather than hidden. "Harvest now, decrypt later" - recording encrypted
+  traffic to break it when the machine exists - is a different threat, and a signature does not
+  answer it.
 - **Recovery without custody.** A seed with hierarchical derivation, and Shamir splitting of that
   seed, so a backup can live across people or places without a company holding the keys.
 - **The protest is inside the chain.** Every transaction carries a memo that is signed with it, so
@@ -144,7 +154,7 @@ and that is deliberate.
 
 | | |
 |---|---|
-| Supply | **1,984,000,000 LETH at genesis**, plus a small tail emission after about 12.9 years ([#133](https://github.com/astrapi69/lethenon/issues/133)). 1984 is the protest in the amount itself |
+| Supply | **1,984,000,000 LETH at genesis**, plus a small tail emission after about 12.9 years ([#133](https://github.com/astrapi69/lethenon/issues/133)). 1984 is the protest in the amount itself: the year of George Orwell's novel *Nineteen Eighty-Four*, about total surveillance. Why the number is 1984 times a million, and where else it appears, is in the [specification](docs/launch/specification.md), section 2 |
 | Base unit | the **lethe**; 10^8 lethe = 1 LETH |
 | Why that magnitude | the genesis supply is 1.984 x 10^17 base units against a 64-bit signed integer's 9.22 x 10^18 - a factor of 46 of headroom, so integer arithmetic suffices and no `BigInteger` is needed. The tail adds at most 66 LETH a block, which leaves at least 5,200 years |
 | Mining reward | **a millionth of the pool per block**, out of a pre-minted pool holding the whole genesis supply: the first block pays exactly 1,984 LETH, and the reward declines from there - half the pool is paid out after about 2.6 years. It never falls below the **tail reward of 66 LETH**, which a block reaches at height 3,403,214, after about 12.9 years. A fee goes into the pool and reaches the miners a share at a time |
@@ -158,7 +168,7 @@ Privacy is four different things here, and what is in and what is out is stated 
 **In:** one-time addresses derived by the sender from the published address, so two payments to the
 same address land on unrelated destinations; a wallet that never asks a server for the balance of an
 address, because that query is how most light wallets expose their users; transport over Tor; and no
-account, no identity check, no telemetry.
+sign-up, no identity check, no telemetry.
 
 **Built of that so far:** the one-time destinations, spendable as well as receivable, and a balance
 that is computed instead of requested. `WalletScan` replays the chain and recognises its own
@@ -195,9 +205,10 @@ details are in `docs/research/pq-privacy-literature.md`, section 15.
 on Ed25519 mathematics - ring signatures, stealth addresses and RingCT are all discrete-logarithm
 constructions. ML-DSA gives none of that; it is a signature scheme, not a toolkit for rings or
 commitments. So Lethenon is **post-quantum in its authenticity, classical in its hidden recipient,
-and open about sender and amount**: transactions are signed with ML-DSA-65 or Ed25519, the
-recipient is hidden with Ed25519 one-time keys and an X25519 view key, and the sender and the amount
-are visible to anybody who reads the chain. The reason is the state of research, not a choice
+and open about sender and amount**: transactions are signed with ML-DSA-65 or Ed25519; a payment to
+a published address hides its recipient behind an Ed25519 one-time key found with an X25519 view
+key, while a transfer to an account (`--to`) and the reward of a block name theirs in the clear; and
+the sender and the amount are visible to anybody who reads the chain. The reason is the state of research, not a choice
 against privacy: the literature survey records, for every candidate, which rule of ADR 0001 it does
 not yet meet. The direction that would join the two halves is post-quantum proofs with a quantum
 proof model, and that is a research programme rather than a milestone.
@@ -224,7 +235,7 @@ primitives; when it uses a new construction, [ADR 0001](docs/adr/0001-new-crypto
 1. one signed transaction, one block, and a replay that proves it - with one-time addresses in the
    format from the start, because an address format is a hard fork to change later
 2. the same chain, post-quantum: both suites in one chain, with their measured sizes
-3. unlinkability: one-time addresses end to end, no balance lookups, Tor transport
+3. recipient unlinkability: one-time addresses end to end, no balance lookups, Tor transport
 4. a wallet that can be recovered from its Shamir shares alone
 5. an internal plugin for [mystic-crypt-ui](https://github.com/astrapi69/mystic-crypt-ui), once
    milestone 4 is green

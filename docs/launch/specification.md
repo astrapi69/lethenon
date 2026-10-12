@@ -18,8 +18,11 @@ differ, the code is right, and this text is the one to fix.
 A protest chain against the politics of surveillance: a joke currency whose point is a working
 demonstration of verification without an observer, post-quantum signatures from the first block,
 recovery without custody, and a memo signed into every transaction ([README](../../README.md),
-"What it demonstrates"). The library is published to Maven Central; the chain is private, and
-nothing about it is sold ([README](../../README.md), "What it is not"). The decisions behind it are
+"What it demonstrates"). It never asks anybody for a balance (section 10) and hides the recipient of
+a payment to a published address (section 5); it does not hide the sender or the amount of a
+transfer, which are public on the chain (sections 5 and 14). The library is published to Maven
+Central; the coin is not traded, and nothing about it is sold ([README](../../README.md), "What it
+is not"). The decisions behind it are
 issues [#1](https://github.com/astrapi69/lethenon/issues/1) (reasoning) and
 [#2](https://github.com/astrapi69/lethenon/issues/2) (milestones).
 
@@ -33,6 +36,16 @@ issues [#1](https://github.com/astrapi69/lethenon/issues/1) (reasoning) and
 | tail | never less than 66 LETH a block; where the pool's share is smaller, the difference is minted, from block 3,403,214, after about 12.9 years. 0.8748 % of the genesis supply a year, against Monero's 0.8702 % at the start of its tail (#133) | `Emission.TAIL_REWARD`, `EmissionSchedule`, `TailEmissionTest` |
 | pre-allocation | none: nobody holds anything before the first block is mined (#111); every genesis reward is burned (section 8) | `GenesisAllocationTest`, `BurnedGenesisTest` |
 | invariant | the balances add up to the genesis supply plus what was minted, after every block | `ChainState.supply`, `ChainState.minted`, `TailEmissionTest` |
+
+**Why 1984.** The number refers to George Orwell's novel *Nineteen Eighty-Four*, about total
+surveillance, and the supply carries it as the project's protest. The supply is 1,984 times a million
+rather than 1,984 because its magnitude has to sit between two bounds: a supply of 1,984 LETH would
+leave balances reading 0.000012, and in lethe the genesis supply, 1.984 x 10^17, stays a factor of 46
+below the 9.22 x 10^18 of a 64-bit `long`, so integer arithmetic suffices (#2, `Amount`). The block
+reward is a millionth of the pool so that the first block pays exactly 1,984 LETH (#133,
+`EmissionTest`). And the wallets derive their keys under `m/1984'` for the same reason (`Wallet`,
+#2). That path is a recovery format and never changes: a seed phrase written down today has to
+restore the same keys under every later version.
 
 The supply is not fixed: the tail adds at most 66 LETH a block, so a 64-bit integer of lethe lasts at
 least 5,200 years (`Amount`). The calculation, with its script, is in #133. Years here are 365.25
@@ -64,6 +77,10 @@ Two destination schemes (`AddressScheme`): `direct`, an account key in the clear
 `P = S + H(s)*B`, found by the recipient with the X25519 view key and spent with the blinded spend
 key (`OneTimeAddresses`, `PublishedAddress`, `WalletScan`, `Sweeps`, #21). Evidence:
 `OneTimeAddressesTest`, `StealthFundsCanBeSpentTest`, `WalletScanTest`, `SweepsTest`.
+
+Only `stealth-v2` hides a recipient. A `direct` transfer names its recipient in the clear, and so does
+a block: its beneficiary is the miner's Ed25519 spend key (`BlockBody`, `MineCommand`). Under both
+schemes the sender and the amount of every transfer are public.
 
 What this hides and what it does not is stated in the README, "Privacy, and its honest label":
 post-quantum in its authenticity, classical in its hidden recipient, open about sender and amount.

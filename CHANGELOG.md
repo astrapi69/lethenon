@@ -4,6 +4,20 @@
 Version 0.5.0 (unreleased)
 -------------
 
+CHANGED:
+
+- the documents say what lethenon hides and what it does not, wherever they speak of privacy or
+  surveillance (#167). The README's opening, the specification's first section and the messaging
+  guide now name what lethenon refuses - no balance asked of anybody, a hidden recipient for a
+  payment to a published address, Tor on the test network - next to what it shows: the sender and
+  the amount of every transfer, the recipient of a transfer to an account and of a block's reward.
+  Sentences that implied more were rephrased: "the chain is private", "the opposite of a permanent
+  record", "unlinkability" as a milestone without saying whose, and "harvest now, decrypt later",
+  which a signature does not answer. The number 1984 is explained: George Orwell's novel
+  *Nineteen Eighty-Four*, why the supply is 1,984 times a million, why the reward is a millionth of
+  the pool, and why the derivation path `m/1984'` never changes (specification, section 2). The
+  messaging guide also says how lethenon and its maintainer's books may refer to each other
+
 ADDED:
 
 - a running node prints a status line, once a minute by default (#149): its height, the hash of its
