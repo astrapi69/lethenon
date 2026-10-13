@@ -12,8 +12,10 @@ CHANGED:
   reachable only through Tor. A table of providers in Iceland, Switzerland, the Netherlands, Finland
   and Germany gives for each the legal order, what its own terms say about a node that mines nothing,
   about mining and about Tor, and the price of the smallest plan that fits the measured minimum, each
-  quoted from the provider's pages of 2026-10-13. Providers that advertise protection from
-  authorities are left out, by name and with the reason
+  quoted from the provider's pages of 2026-10-13. Left out, by name and with the quote, are providers
+  that advertise ignoring or evading lawful orders, anonymous customers without an identity check,
+  "offshore" as protection from the law, or immunity to takedown requests; data minimisation alone
+  is no reason
 
 - the documents say what lethenon hides and what it does not, wherever they speak of privacy or
   surveillance (#167). The README's opening, the specification's first section and the messaging
