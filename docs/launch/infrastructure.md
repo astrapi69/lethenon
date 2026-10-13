@@ -5,21 +5,106 @@ Not legal advice. Last reviewed 2026-10-08. Check with a lawyer before a public 
 What a public start of the main chain needs in servers, operation and money, with the measurements
 and the providers' terms it rests on. Today a node runs only on the test chain: "The main chain gets
 a network only by a later decision" ([ADR 0003](../adr/0003-test-network.md), "Only the test chain"); everything here
-prepares that decision and assumes nothing about it. Sources were retrieved on 2026-10-08 and are
-listed at the end.
+prepares that decision and assumes nothing about it. Sources were retrieved on 2026-10-08, those of
+the providers by country (section 1) on 2026-10-13, and are listed at the end.
 
-## 1. Seed nodes: at least two, at different providers
+## 1. Seed nodes: three, at three providers in three countries, and one at home
 
 A seed node is a `lethenon node` that listens on a fixed address, mines nothing, and is named to a new
 node as its first peer; peer exchange then passes it further addresses (ADR 0003, "Peer exchange").
 The servers run nodes only: no miner, and no wallet, so no key that moves LETH lives on them.
 
-- **Two to three**, each at a different provider, or at least in a different region, so that the
-  network's entry points do not end with one provider's outage, its change of terms or its prices.
-- **Oracle Cloud Always Free as one of them, and at least one at a provider that is paid for**
-  (section 3). A free offer can change without the network having a say: Oracle halved the Ampere A1
-  allowance of its Always Free accounts in 2026.
+- **Three seed nodes at three providers in three countries, each under a different legal order, plus
+  the maintainer's node at home** (decided 2026-10-13, #188). Then neither one provider's outage,
+  change of terms or prices, nor one country's law ends the network's entry points.
+- **1984 Hosting in Iceland is the maintainer's favourite and first candidate**; the two others are
+  at providers in other countries. The choice and its reasons are below.
 - Each with an onion service (section 5), so the network is reachable over Tor as well.
+- Oracle Cloud Always Free (section 3) can run an additional node at no cost. It is not one of the
+  three: Oracle may reclaim an idle instance, and a free offer can change without the network having
+  a say - Oracle halved the Ampere A1 allowance of its Always Free accounts in 2026.
+
+### Providers by country
+
+Read on 2026-10-13 from each provider's own terms and price pages; the sources are listed at the end.
+The minimum size is the measured one (section 2): 1 vCPU, 512 MB of memory, 10 GB of disk. "Not
+mentioned" means the provider's terms, acceptable use policy and FAQ were searched for blockchain,
+node, crypto, Tor, onion and relay without a match; it is not a permission.
+
+**Who is left out** (decided by the maintainer on 2026-10-13, #188): a provider that advertises that
+it ignores or evades lawful orders, that it keeps customers anonymous without an identity check, that
+it offers "offshore" as protection from the law, or that it is immune to takedown requests. Data
+minimisation alone is no reason to leave a provider out.
+
+| Country | Provider, legal order | Smallest plan that fits, price per month as shown | Blockchain node that mines nothing | Mining | Tor |
+|---|---|---|---|---|---|
+| Iceland | **1984 Hosting** (1984 ehf., Reykjavík): "These Terms are governed by Icelandic law. Disputes arising from these Terms shall be brought before the Reykjavík District Court." (terms 11.1) | VPS #1: 1 CPU, 1 GB, 25 GB, 1 TB transfer; **EUR 8.72** / ISK 1,642. Whether VAT and an IPv4 address are included is not stated. "You pay for one or three years in advance" (FAQ, worded for hosting); "a 7 day money-back guarantee for VPS" (terms 3.1) | not mentioned | forbidden: "Cryptomining is not permitted on any 1984 servies." (terms 8.3, their spelling) | not mentioned on its own pages. The Tor Project's community list has "1984Hosting ... Relay: Yes ... Exit: Yes" (last updated 05/2024; a third party, not 1984) |
+| Switzerland | **Exoscale** (Akenes SA, Lausanne): "governed by the laws of Switzerland", courts of the canton of Vaud, Lausanne (terms 14.9) | Micro: 1 core, 512 MB, with 10 GiB local storage, in Geneva or Zurich: CHF 0.00729 an hour plus CHF 0.00014 per GiB-hour, so **about CHF 6.26** for 30 days (computed from its price API). "All prices exclude any applicable tax."; IPv4 "included and free of charge"; billed by the second, "no long-term commitments" | not mentioned | not mentioned: no clause | not mentioned |
+| Netherlands | **TransIP** (TransIP B.V., Amsterdam): "Op deze Overeenkomst is Nederlands recht van toepassing." (terms 18.3), court of the district of its seat (18.4) | V1: 1 vCPU, 1 GB, 100 GB; "Vanaf **€ 5,-** per maand", "Prijzen excl. btw"; one IPv4 included (knowledge base 215, of December 2024); one month, renewed monthly (terms 2.6) | not mentioned; "In principe mag je alle content installeren / gebruiken op je VPS die binnen de Nederlandse- dan wel Europese wet- en regelgeving toegestaan is." (knowledge base 185) | forbidden: "Om die reden is mining niet toegestaan op ons VPS-platform." (knowledge base 185) | not mentioned; proxies and anonymizers allowed, with strict action on abuse (knowledge base 185) |
+| Netherlands | **Greenhost** (Greenhost BV, Amsterdam): "The Agreement is subject to Dutch law." (terms 17, version 2019-01; the English text names the customer's court district, the Dutch text Greenhost's) | Green 1: 1 CPU, 1 GiB, 10 GiB, 1 TiB a month, servers in the Netherlands; **"€ 7.89 / month"**, "Prices shown are exclusive of VAT applicable in your region."; IPv4 not stated; "By default VPSs are invoiced monthly, based on actual resource usage."; private accounts possible, verified by a payment of 1 cent | not mentioned | not mentioned: no clause | not mentioned in its terms; it runs Tor itself: "We run several servers in the Tor-network." (privacy page) |
+| Finland | **UpCloud** (UpCloud Oy, Helsinki): Finnish law, arbitration in Helsinki (terms 31) | Starter: 1 CPU, 1 GB, 10 GB; **"€3/mo"**, "Prices exclude any applicable local taxes", "IPv4 included", billed by the hour, no minimum term. **Business use only**: "The Service is not fit or intended for use by, and UpCloud is not obliged to provide it for, consumers or private persons for their personal use." (terms 1.2) | not mentioned | "You are not permitted to mine any cryptocurrencies without obtaining prior written approval from UpCloud." | not mentioned |
+| Finland, German law | **Hetzner Cloud, Helsinki** (Hetzner Online GmbH, Gunzenhausen): German law, courts in Gunzenhausen (terms 14.1, 14.2) | CPX02: 1 vCPU, 1 GB, 20 GB; **EUR 5.99 + EUR 0.50** for IPv4, without VAT, billed by the hour (Hetzner's price data) | not mentioned | forbidden: "Weiterhin ist der Betrieb von Applikationen zum Mining von Kryptowährungen untersagt." (terms 8.3) | not mentioned |
+| Germany | **Hetzner Cloud**, Falkenstein or Nuremberg, as the row above | CPX02 as above, EUR 6.49 without VAT | not mentioned | forbidden, as above | not mentioned |
+| Germany | **netcup** (netcup GmbH, Karlsruhe): "Es gilt deutsches Recht." (terms 8) | VPS pico G11.5s in Nuremberg: 1 vCore, 1 GB, 30 GB; **"2,21 €"** with 19 % VAT and IPv4; 12 months minimum, "auf 1 Stück pro Kunde limitiert" | not mentioned | forbidden: "Mining-Diensten" for "Bitcoin", "Ethereum", "OneCoin" or "Monero" (terms) | not mentioned in its terms |
+
+Looked at and left out because of their terms:
+
+- **Infomaniak** (Switzerland): its VPS terms forbid "toute activité de quelque sorte liée au minage de
+  Cryptomonnaies", "logiciels Peer-to-Peer" and "mise en place de relais TOR"; its Public Cloud terms
+  forbid "any activity related to cryptocurrencies", which reads as covering a node. It would need a
+  written answer first.
+- **Leaseweb** (Netherlands): sells to businesses only ("not including any private individual"); its
+  VPS forbid "anonymization services or public proxies, including VPNs, Tor, P2P services"; and its
+  sales terms forbid "any cryptographic use applied to blockchains" without its prior approval.
+
+Left out under the rule above, each with what its own pages say (2026-10-13):
+
+- **FlokiNET** (Iceland, Finland): anonymous customers and evading orders - "No ID. No questions. No
+  tracking.", "We do not require personal information to use our services.", "We fight requests for
+  data"; and offshore - its page title is "FlokiNET - Secure, Stable, Anonymous, Offshore Privacy
+  focused Hosting Services".
+- **Orange Website** (Iceland): anonymous customers - "You may sign up and use our services completely
+  anonymously."; and offshore - "Our data centers are located in Iceland, our chosen offshore hosting
+  location."
+- **Anubiz Host** (Iceland VPS): immune to takedowns - "DMCA IGNORED"; anonymous customers - "No KYC on
+  signup."; and "Offshore Hosting".
+- **LibertyVPS** (Netherlands): "Offshore VPS Hosting" for "people that face censorship, discrimination
+  and pressure to remove content", and anonymous customers - "order in anonimity" (its spelling).
+- **PrivateAlps** (Switzerland): offshore as protection from the law - "Operate securely under offshore
+  laws."; anonymous customers - "No KYC Required"; and "Anonymity, Uncensored".
+- No Icelandic company other than 1984 Hosting sells a small VPS on its own pages: the large IT and
+  telecom companies do not, and the Icelandic data centres rent space, not virtual servers.
+
+1984 Hosting advertises "Free speech and privacy since 2006.", "No Logging Policy" and, on its About
+page, "the right to anonymity and privacy", and it promises to "inform our customers of any inquiries
+from any authorities, lawyers or courts". Its terms also say that it "will provide access information
+when served with a valid court order", and its privacy page that it transfers personal data to
+"law enforcement agencies" when the law obliges it to. Judged by the maintainer on 2026-10-13: it
+does not fall under the rule, because its terms provide expressly for handing over data on a court
+order (#188). Greenhost's privacy page says "We stopped logging non-critical email information in
+order to be safeguarded from having to share these with national authorities." - data minimisation,
+which the rule does not exclude; its terms disclose data when "required to pursuant to a statutory
+provision or court order", and it runs a notice-and-takedown procedure.
+
+### The recommendation
+
+| | Provider | Country, legal order | Why |
+|---|---|---|---|
+| 1 | 1984 Hosting, VPS #1 | Iceland, Icelandic law | the maintainer's choice; the only Icelandic company found with a small VPS. Before ordering, ask in writing: a node that mines nothing and an onion service, both not mentioned in its terms; whether the price includes VAT and an IPv4 address; whether a VPS is paid by the month or for one or three years |
+| 2 | Exoscale, Micro, in Zurich or Geneva | Switzerland, Swiss law | no minimum term, IPv4 included, registering as a company is optional; nothing in its terms against a node or Tor |
+| 3 | TransIP, V1, in Amsterdam | Netherlands, Dutch law | inside the EU, where 1 and 2 are not; month by month; its knowledge base allows any content Dutch and European law allows, and forbids mining |
+| + | the maintainer's node at home | the maintainer's country | a fourth node outside any provider's terms |
+
+The node at home is reached only through Tor and connects only through Tor: `--proxy` sends every
+outgoing connection through Tor's SOCKS port and makes the node listen on 127.0.0.1 only; an onion
+service whose `HiddenServicePort` leads to that port serves the chain (section 5); `--tx-proxy` with
+`--anonymous-inbound` adds the anonymity zone (ADR 0004, docs/tor.md). Then no port is opened at home,
+and the home connection's IP address is not handed to peers: "Onion services don't need open ports
+because they punch through NAT" (section 5).
+
+The other providers in the table stay the alternatives: Greenhost in the Netherlands, which runs Tor
+itself; Hetzner in Germany or Helsinki; netcup for a year's term; UpCloud for whoever contracts as a
+business.
 
 ## 2. How big, measured
 
@@ -201,8 +286,9 @@ aarch64; it was not run on ARM for this document, which is the first thing to ch
 
 ## 4. No mining on the servers
 
-Every provider looked at forbids mining or needs a permission for it; none of the terms read forbids
-running a node that mines nothing. The servers run nodes only.
+Every provider in this table forbids mining or needs a permission for it; Exoscale and Greenhost (section 1) have
+no clause either way. Only Leaseweb and Infomaniak's Public Cloud have terms that read as forbidding a
+node that mines nothing (section 1). The servers run nodes only.
 
 | Provider | Mining | Where | A node that mines nothing |
 |---|---|---|---|
@@ -235,8 +321,10 @@ it is not a permission.
   a node over Tor can take the chain from it (`sync --proxy`, docs/tor.md). Its address goes on the
   website (section 8).
 - **The providers**: DigitalOcean and Vultr forbid Tor exit nodes, Hostinger for its GPU service;
-  Contabo may block a server running Tor once it learns the server is used unlawfully. An onion service
-  is not an exit node, and none of the terms read forbids one.
+  Contabo may block a server running Tor once it learns the server is used unlawfully. Leaseweb forbids
+  Tor on its VPS altogether, and Infomaniak forbids Tor relays (section 1). An onion service is not an
+  exit node, and none of the other terms read forbids one; the recommended providers say nothing
+  about Tor at all (section 1).
 - **Keep the keys**: the files in `HiddenServiceDir` are the onion address. They go into the backup
   (section 6), or the address changes with the next server.
 
@@ -381,10 +469,11 @@ pages showed it on 2026-10-08. Prices change; each is the provider's figure on t
 | Vultr | vc2-1c-1gb | 1 / 1 GB / 25 GB | 1 TB | USD 5.00 | not stated | Amsterdam, Frankfurt, London, Paris, Warsaw and others |
 | Akamai / Linode | Nanode 1 GB | 1 / 1 GB / 25 GB | 1 TB | USD 5.00 | not stated | Frankfurt, Amsterdam, London, Paris, Stockholm and others |
 
-An example set of three seed nodes at three providers: Oracle (free), Hetzner CPX02 in Helsinki
-(EUR 6.49 without VAT, EUR 7.72 with 19 %) and netcup VPS pico in Nuremberg (EUR 2.21 with VAT) -
-about EUR 9.93 a month with VAT, computed from the table. A domain is not priced here: the website
-works without one, under GitHub's own address.
+The recommended set (section 1, prices of 2026-10-13): 1984 Hosting VPS #1 at EUR 8.72 a month
+(VAT and IPv4 not stated, possibly paid a year in advance), Exoscale Micro at about CHF 6.26 for 30
+days without VAT, and TransIP V1 at EUR 5 a month without VAT; the node at home costs only its
+power. The three are in three currencies and with different VAT, so no total is given here. A domain
+is not priced here: the website works without one, under GitHub's own address.
 
 ## 12. Later: a block explorer and a faucet for the test network
 
@@ -458,3 +547,42 @@ Retrieved 2026-10-08.
   <https://curia.europa.eu/juris/liste.jsf?num=C-582/14>
 - Maven Central, lethenon 0.3.0 and its signature:
   <https://repo1.maven.org/maven2/io/github/astrapi69/lethenon/0.3.0/>
+
+Retrieved 2026-10-13, for section 1, "Providers by country" (#188):
+
+- 1984 Hosting: terms <https://1984.hosting/tos/> and <https://1984.is/tos/> ("last updated on July
+  21st, 2021"), price list <https://1984.hosting/product/pricelist/>, VPS <https://1984.hosting/product/vps/>,
+  FAQ <https://1984.hosting/faq/>, About <https://1984.hosting/about/>, homepage <https://1984.hosting/>,
+  privacy <https://1984.hosting/GDPR/>
+- Tor Project, community list of providers:
+  <https://community.torproject.org/relay/community-resources/good-bad-isps/>
+- Exoscale: terms <https://www.exoscale.com/terms/> ("Applicable starting July 2nd, 2026"), pricing
+  <https://www.exoscale.com/pricing/> with its price API <https://portal.exoscale.com/api/pricing/opencompute>,
+  data centres <https://www.exoscale.com/datacenters/>, homepage <https://www.exoscale.com/>
+- TransIP: terms <https://www.transip.nl/algemene-voorwaarden/> (PDF, "Versie 2503/v1.1"), VPS
+  <https://www.transip.nl/vps/>, knowledge base 185
+  <https://www.transip.nl/knowledgebase/overige-use-cases/185-mag-alle-content-gebruiken-installeren>
+  and 215 <https://www.transip.nl/knowledgebase/vps-controlepaneel/215-hoeveel-ip-adressen-krijg-bij-een>
+- UpCloud: terms <https://upcloud.com/terms-of-service/> (effective 3 July 2026), pricing
+  <https://upcloud.com/pricing/>, availability <https://upcloud.com/docs/products/cloud-servers/availability/>
+- Hetzner: terms <https://www.hetzner.com/legal/terms-and-conditions/> and
+  <https://www.hetzner.com/assets/Uploads/downloads/AGB-en.pdf>, price data
+  <https://website-price-api.hetzner.com/api/v1/products/CLOUD_136> and `CLOUD_21` (IPv4); the live
+  pages answered with HTTP 429 later that day, so the prices are from copies taken earlier the same day
+- netcup: terms <https://www.netcup.com/de/agb>, VPS pico
+  <https://www.netcup.com/de/server/vps/vps-pico-g11.5s-12m-nue>
+- Infomaniak: VPS terms <https://welcome.infomaniak.com/api/web-components/1/cgu/latest?id=97&locale=fr_FR>
+  ("Révision du 24/06/2026"), Public Cloud terms
+  <https://welcome.infomaniak.com/api/web-components/1/cgu/latest?id=70&locale=en_GB>
+- Leaseweb: sales terms
+  <https://nl.object-storage.io/legal-files/Sales%20Contract%20-%201st%20August%202026/NL/LSW_NL_B2B_Sales_Contract_Schedule%20_v1August2026_Leaseweb_Sales%20Terms%20and%20Conditions.pdf>,
+  service specifications
+  <https://a.storyblok.com/f/294754123306010/x/c90639770b/services-specifications-leaseweb-netherlands-b-v.pdf>
+- Greenhost: terms <https://greenhost.net/legal/terms-and-conditions/> ("Version: 2019-01") and
+  <https://greenhost.nl/juridisch/algemene-voorwaarden/>, VPS <https://greenhost.net/products/vps/>,
+  notice and takedown <https://greenhost.net/legal/notice-and-takedown/> ("Version: 2020-01"), privacy
+  <https://greenhost.net/privacy/>
+- Left out under the rule: FlokiNET <https://flokinet.is/> (its texts are in the page's script files
+  `/_nuxt/CP62iTb2.js` and `/_nuxt/DulXf0c_.js`), Orange Website <https://www.orangewebsite.com/> and
+  <https://orangewebsite.com/hosting/offshore-hosting>, Anubiz Host <https://anubizhost.com/>,
+  LibertyVPS <https://libertyvps.net/>, PrivateAlps <https://privatealps.net/en>
