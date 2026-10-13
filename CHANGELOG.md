@@ -6,6 +6,15 @@ Version 0.5.0 (unreleased)
 
 CHANGED:
 
+- `docs/launch/infrastructure.md` says where the seed nodes stand (#188): three at three providers in
+  three countries under three legal orders - 1984 Hosting in Iceland, the maintainer's favourite,
+  Exoscale in Switzerland and TransIP in the Netherlands - plus the maintainer's node at home,
+  reachable only through Tor. A table of providers in Iceland, Switzerland, the Netherlands, Finland
+  and Germany gives for each the legal order, what its own terms say about a node that mines nothing,
+  about mining and about Tor, and the price of the smallest plan that fits the measured minimum, each
+  quoted from the provider's pages of 2026-10-13. Providers that advertise protection from
+  authorities are left out, by name and with the reason
+
 - the documents say what lethenon hides and what it does not, wherever they speak of privacy or
   surveillance (#167). The README's opening, the specification's first section and the messaging
   guide now name what lethenon refuses - no balance asked of anybody, a hidden recipient for a
