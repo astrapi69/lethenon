@@ -15,7 +15,9 @@ CHANGED:
   quoted from the provider's pages of 2026-10-13. Left out, by name and with the quote, are providers
   that advertise ignoring or evading lawful orders, anonymous customers without an identity check,
   "offshore" as protection from the law, or immunity to takedown requests; data minimisation alone
-  is no reason
+  is no reason. 1984 Hosting's support, asked in writing before an order, answered that a VPS has no
+  restriction beyond spam, its terms and Icelandic law, that an onion service is "fine by us", that a
+  billing address outside Iceland pays no VAT, that IPv4 is included and that it can be paid monthly
 
 - the documents say what lethenon hides and what it does not, wherever they speak of privacy or
   surveillance (#167). The README's opening, the specification's first section and the messaging

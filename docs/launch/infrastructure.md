@@ -38,7 +38,7 @@ minimisation alone is no reason to leave a provider out.
 
 | Country | Provider, legal order | Smallest plan that fits, price per month as shown | Blockchain node that mines nothing | Mining | Tor |
 |---|---|---|---|---|---|
-| Iceland | **1984 Hosting** (1984 ehf., Reykjavík): "These Terms are governed by Icelandic law. Disputes arising from these Terms shall be brought before the Reykjavík District Court." (terms 11.1) | VPS #1: 1 CPU, 1 GB, 25 GB, 1 TB transfer; **EUR 8.72** / ISK 1,642. Whether VAT and an IPv4 address are included is not stated. "You pay for one or three years in advance" (FAQ, worded for hosting); "a 7 day money-back guarantee for VPS" (terms 3.1) | not mentioned | forbidden: "Cryptomining is not permitted on any 1984 servies." (terms 8.3, their spelling) | not mentioned on its own pages. The Tor Project's community list has "1984Hosting ... Relay: Yes ... Exit: Yes" (last updated 05/2024; a third party, not 1984) |
+| Iceland | **1984 Hosting** (1984 ehf., Reykjavík): "These Terms are governed by Icelandic law. Disputes arising from these Terms shall be brought before the Reykjavík District Court." (terms 11.1) | VPS #1: 1 CPU, 1 GB, 25 GB, 1 TB transfer; **EUR 8.72** / ISK 1,642. Its support, asked in writing: "VAT is not charged if you inform us about a billing address outside of Iceland. We charge Icelandic VAT to Icelanders, no VAT to others. Publicly routeable IPv4 is included." and "It can be paid monthly." (e-mail, 2026-10-14); "a 7 day money-back guarantee for VPS" (terms 3.1) | not mentioned in the terms. Its support: "We have no particular restrictions on the use of VPS except for a mercilessly strict zero-tolerance spam policy, our TOS and Icelandic laws. Other than that, we do not issue any declarations about any particular usage patterns." (e-mail, 2026-10-14) | forbidden: "Cryptomining is not permitted on any 1984 servies." (terms 8.3, their spelling) | not mentioned on its own pages. Its support, asked about an onion service that is no relay and no exit: "fine by us" (e-mail, 2026-10-14). The Tor Project's community list has "1984Hosting ... Relay: Yes ... Exit: Yes" (last updated 05/2024; a third party, not 1984) |
 | Switzerland | **Exoscale** (Akenes SA, Lausanne): "governed by the laws of Switzerland", courts of the canton of Vaud, Lausanne (terms 14.9) | Micro: 1 core, 512 MB, with 10 GiB local storage, in Geneva or Zurich: CHF 0.00729 an hour plus CHF 0.00014 per GiB-hour, so **about CHF 6.26** for 30 days (computed from its price API). "All prices exclude any applicable tax."; IPv4 "included and free of charge"; billed by the second, "no long-term commitments" | not mentioned | not mentioned: no clause | not mentioned |
 | Netherlands | **TransIP** (TransIP B.V., Amsterdam): "Op deze Overeenkomst is Nederlands recht van toepassing." (terms 18.3), court of the district of its seat (18.4) | V1: 1 vCPU, 1 GB, 100 GB; "Vanaf **€ 5,-** per maand", "Prijzen excl. btw"; one IPv4 included (knowledge base 215, of December 2024); one month, renewed monthly (terms 2.6) | not mentioned; "In principe mag je alle content installeren / gebruiken op je VPS die binnen de Nederlandse- dan wel Europese wet- en regelgeving toegestaan is." (knowledge base 185) | forbidden: "Om die reden is mining niet toegestaan op ons VPS-platform." (knowledge base 185) | not mentioned; proxies and anonymizers allowed, with strict action on abuse (knowledge base 185) |
 | Netherlands | **Greenhost** (Greenhost BV, Amsterdam): "The Agreement is subject to Dutch law." (terms 17, version 2019-01; the English text names the customer's court district, the Dutch text Greenhost's) | Green 1: 1 CPU, 1 GiB, 10 GiB, 1 TiB a month, servers in the Netherlands; **"€ 7.89 / month"**, "Prices shown are exclusive of VAT applicable in your region."; IPv4 not stated; "By default VPSs are invoiced monthly, based on actual resource usage."; private accounts possible, verified by a payment of 1 cent | not mentioned | not mentioned: no clause | not mentioned in its terms; it runs Tor itself: "We run several servers in the Tor-network." (privacy page) |
@@ -90,7 +90,7 @@ provision or court order", and it runs a notice-and-takedown procedure.
 
 | | Provider | Country, legal order | Why |
 |---|---|---|---|
-| 1 | 1984 Hosting, VPS #1 | Iceland, Icelandic law | the maintainer's choice; the only Icelandic company found with a small VPS. Before ordering, ask in writing: a node that mines nothing and an onion service, both not mentioned in its terms; whether the price includes VAT and an IPv4 address; whether a VPS is paid by the month or for one or three years |
+| 1 | 1984 Hosting, VPS #1 | Iceland, Icelandic law | the maintainer's choice; the only Icelandic company found with a small VPS. Asked in writing before ordering, its support answered on 2026-10-14: no restriction on a VPS beyond spam, its terms and Icelandic law; an onion service "fine by us"; no VAT for a billing address outside Iceland; IPv4 included; payable monthly |
 | 2 | Exoscale, Micro, in Zurich or Geneva | Switzerland, Swiss law | no minimum term, IPv4 included, registering as a company is optional; nothing in its terms against a node or Tor |
 | 3 | TransIP, V1, in Amsterdam | Netherlands, Dutch law | inside the EU, where 1 and 2 are not; month by month; its knowledge base allows any content Dutch and European law allows, and forbids mining |
 | + | the maintainer's node at home | the maintainer's country | a fourth node outside any provider's terms |
@@ -469,8 +469,9 @@ pages showed it on 2026-10-08. Prices change; each is the provider's figure on t
 | Vultr | vc2-1c-1gb | 1 / 1 GB / 25 GB | 1 TB | USD 5.00 | not stated | Amsterdam, Frankfurt, London, Paris, Warsaw and others |
 | Akamai / Linode | Nanode 1 GB | 1 / 1 GB / 25 GB | 1 TB | USD 5.00 | not stated | Frankfurt, Amsterdam, London, Paris, Stockholm and others |
 
-The recommended set (section 1, prices of 2026-10-13): 1984 Hosting VPS #1 at EUR 8.72 a month
-(VAT and IPv4 not stated, possibly paid a year in advance), Exoscale Micro at about CHF 6.26 for 30
+The recommended set (section 1, prices of 2026-10-13): 1984 Hosting VPS #1 at EUR 8.72 a month,
+with IPv4, monthly, and without VAT for a billing address outside Iceland (its support, 2026-10-14),
+Exoscale Micro at about CHF 6.26 for 30
 days without VAT, and TransIP V1 at EUR 5 a month without VAT; the node at home costs only its
 power. The three are in three currencies and with different VAT, so no total is given here. A domain
 is not priced here: the website works without one, under GitHub's own address.
@@ -553,7 +554,9 @@ Retrieved 2026-10-13, for section 1, "Providers by country" (#188):
 - 1984 Hosting: terms <https://1984.hosting/tos/> and <https://1984.is/tos/> ("last updated on July
   21st, 2021"), price list <https://1984.hosting/product/pricelist/>, VPS <https://1984.hosting/product/vps/>,
   FAQ <https://1984.hosting/faq/>, About <https://1984.hosting/about/>, homepage <https://1984.hosting/>,
-  privacy <https://1984.hosting/GDPR/>
+  privacy <https://1984.hosting/GDPR/>; and its support's e-mail of 2026-10-14 answering the
+  maintainer's four questions (node, onion service, VAT and IPv4, monthly payment), kept by the
+  maintainer and quoted in #188
 - Tor Project, community list of providers:
   <https://community.torproject.org/relay/community-resources/good-bad-isps/>
 - Exoscale: terms <https://www.exoscale.com/terms/> ("Applicable starting July 2nd, 2026"), pricing
