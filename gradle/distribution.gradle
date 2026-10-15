@@ -1,0 +1,66 @@
+/*
+ * The command line distribution as a release artifact (lethenon#196).
+ *
+ * What installDist builds, as a zip and as a tar.gz, each with a SHA-256 and a SHA-512 file in the
+ * format sha256sum -c and sha512sum -c read, the family's convention (mystic-crypt-ui's
+ * checksumInstaller), and with a detached, ASCII-armoured signature by the key that signs the Maven
+ * publication (gradle/publishing.gradle): the signing subkey in CI, gpg on the maintainer's machine.
+ *
+ * ./gradlew releaseDistribution builds all of it into build/distributions;
+ * .github/workflows/distribution.yml verifies it and attaches it to the GitHub release of a tag.
+ * A release version without a signing key is refused before anything is built.
+ */
+def releaseVersion = !version.endsWith("SNAPSHOT")
+
+tasks.named('distTar', Tar) {
+    compression = Compression.GZIP
+    archiveExtension = 'tar.gz'
+}
+
+def distributionArchives = files(tasks.named('distZip').flatMap { it.archiveFile },
+    tasks.named('distTar').flatMap { it.archiveFile })
+Map<String, String> distributionDigests = ["SHA-256": "sha256", "SHA-512": "sha512"]
+
+tasks.register('distributionChecksums') {
+    group = 'distribution'
+    description = 'Writes the SHA-256 and SHA-512 files next to the zip and the tar.gz.'
+    inputs.files(distributionArchives).withPropertyName('archives')
+    outputs.files(provider {
+        distributionArchives.files.collectMany { archive ->
+            distributionDigests.values().collect { new File(archive.parentFile, "${archive.name}.$it") }
+        }
+    })
+    doLast {
+        distributionArchives.files.each { archive ->
+            distributionDigests.each { algorithm, extension ->
+                def digest = java.security.MessageDigest.getInstance(algorithm)
+                archive.withInputStream { stream ->
+                    byte[] buffer = new byte[8192]
+                    int read
+                    while ((read = stream.read(buffer)) != -1) {
+                        digest.update(buffer, 0, read)
+                    }
+                }
+                new File(archive.parentFile, "${archive.name}.$extension").text =
+                    "${digest.digest().encodeHex()}  ${archive.name}\n"
+            }
+        }
+    }
+}
+
+tasks.register('releaseDistribution') {
+    group = 'distribution'
+    description = 'Builds the zip and the tar.gz of the command line, their checksums and signatures.'
+    dependsOn 'distributionChecksums'
+    if (distributionSigned) {
+        dependsOn 'signDistZip', 'signDistTar'
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    if (releaseVersion && !distributionSigned && graph.hasTask(':releaseDistribution')) {
+        throw new GradleException("Refusing to build the release distribution of ${version} "
+            + "unsigned. Set GPG_PRIVATE_KEY and GPG_PASSPHRASE, or a local signing.keyId / "
+            + "signing.gnupg.keyName / signing.secretKeyRingFile property.")
+    }
+}

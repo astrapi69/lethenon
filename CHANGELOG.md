@@ -49,6 +49,18 @@ ADDED:
   in `TestNetworkSeedsTest`, `DefaultPeersTest` and `TestNetworkSeedsOnTheCommandLineTest`, which
   reach a seed only through the test SOCKS5 server; a watcher on `ss` saw no connection to the real
   seed during the whole suite
+- the command line distribution is a release artifact (#196). `./gradlew releaseDistribution` builds
+  what `installDist` builds as `lethenon-X.Y.Z.zip` and, compressed now, `lethenon-X.Y.Z.tar.gz`. Next
+  to each it writes a SHA-256 and a SHA-512 file in the format `sha256sum -c` reads, the family's
+  convention, and an ASCII-armoured signature by the key that signs the Maven publication, which in CI
+  is the signing subkey. A release version without a signing key is refused before anything is built;
+  a plain `./gradlew build` signs nothing. The new workflow `distribution.yml` runs it on a
+  `RELEASE-*` tag. It verifies every signature against the key fetched by its fingerprint from a
+  keyserver, and every checksum, and attaches the eight files to the tag's GitHub release, created as
+  a draft when there is none yet. Run by hand, it is the rehearsal and keeps the files as a workflow
+  artifact. Measured locally without a key: the four checksum files pass `sha256sum -c` and
+  `sha512sum -c`, and `-PprojectVersion=0.5.0` ends with "Refusing to build the release distribution
+  of 0.5.0 unsigned"
 - a running node prints a status line, once a minute by default (#149): its height, the hash of its
   tip, the connected peers with the outgoing and incoming connections it holds, the anonymity
   zone's peers where there is a zone, the waiting transfers, the blocks it mined, and how many

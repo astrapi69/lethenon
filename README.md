@@ -264,6 +264,15 @@ gpg --keyserver hkps://keys.openpgp.org --recv-keys 5B2FA6B11E298BC09287F423D8C4
 gpg --verify lethenon-0.4.0.jar.asc lethenon-0.4.0.jar
 ```
 
+From 0.5.0 on, the GitHub release of every version also carries the command line, the content of
+`installDist`, as `lethenon-X.Y.Z.zip` and `lethenon-X.Y.Z.tar.gz`. Each archive has a signature
+(`.asc`) and a SHA-256 and a SHA-512 file next to it:
+
+```sh
+gpg --verify lethenon-0.5.0.tar.gz.asc lethenon-0.5.0.tar.gz
+sha256sum -c lethenon-0.5.0.tar.gz.sha256
+```
+
 gpg answers `Good signature` and prints the `Primary key fingerprint`, for a release signed by the
 subkey also the `Subkey fingerprint`. Both have to be the ones above. The warning that the key "is
 not certified with a trusted signature" only says that you have not marked the key as trusted in your
@@ -287,11 +296,16 @@ What a release consists of, in the order it is run (0.2.0 was the first one run 
    `release/*` branch is open, and a change that belongs to the release carries the label
    `release-content` (astrapi69/mystic-crypt-ui#516).
 4. **Tag the release commit** with an annotated `RELEASE-X.Y.Z` and push the tag. The publish workflow
-   uploads to the Central Portal, where the maintainer releases it. A pushed tag is never moved or
+   uploads to the Central Portal, where the maintainer releases it. The distribution workflow builds the
+   command line's zip and tar.gz, signs them, verifies the signatures against the key on a keyserver and
+   the checksums, and attaches the eight files to a draft GitHub release of the tag (#196). A pushed tag is never moved or
    deleted; a failed run is fixed on the branch and re-run.
 5. **Verify on Central**, with the artifacts downloaded inside the command that checks them: the jar,
    pom, `-sources.jar`, `-javadoc.jar`, `.module`, and `gpg --verify` on each `.asc`.
-6. **GitHub release** from the CHANGELOG entry, without binaries: this is a library.
+6. **GitHub release** from the CHANGELOG entry: the draft the distribution workflow made, with its
+   eight files - the zip and the tar.gz, each with `.asc`, `.sha256` and `.sha512`. The notes come from
+   the CHANGELOG, and the draft is published by the maintainer. Before 0.5.0 a release carried no
+   binaries.
 7. **`master` follows the release**: a fast-forward to the tagged commit
    (`git push origin "RELEASE-X.Y.Z^{}:master"`), otherwise a merge of the tag on `master`, never a
    force push. Afterwards `git diff RELEASE-X.Y.Z master` is empty. (`master` exists since 0.2.0; the

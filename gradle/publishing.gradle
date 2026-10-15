@@ -81,6 +81,8 @@ def signingKeyId = System.getenv("GPG_KEY_ID")
 def hasInMemoryKey = signingKey && signingPassphrase
 def hasLocalKey = ["signing.keyId", "signing.gnupg.keyName", "signing.secretKeyRingFile"]
     .any { project.hasProperty(it) }
+// read by gradle/distribution.gradle: the command line archives are signed by the same key (#196)
+ext.distributionSigned = hasInMemoryKey || hasLocalKey
 
 signing {
     if (hasInMemoryKey) {
@@ -90,11 +92,13 @@ signing {
             useInMemoryPgpKeys(signingKey, signingPassphrase)
         }
         sign publishing.publications.mavenJava
+        sign distZip, distTar
     }
     else if (hasLocalKey) {
         // the local gpg command with the key from signing.gnupg.keyName
         useGpgCmd()
         sign publishing.publications.mavenJava
+        sign distZip, distTar
     }
 }
 
