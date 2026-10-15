@@ -365,6 +365,16 @@ it is not a permission.
   only through its onion service needs no open port for it (section 5).
 - **SSH with a key only**: `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, and
   `PermitRootLogin no` (OpenSSH, `sshd_config`).
+- **After every change to the SSH configuration, read the values in effect with `sshd -T`**, not only
+  `sshd -t`: `sshd -t` says the files are valid, `sshd -T` prints what the server will actually use
+  (`sudo sshd -T | grep -E '^(permitrootlogin|passwordauthentication|kbdinteractiveauthentication) '`).
+  Then open a new connection as the new user, while a session that is already logged in stays open,
+  and only then close that session. The reason, measured on the first seed node on 2026-10-15
+  (#191): the Debian 13 image of 1984 Hosting has no `Include /etc/ssh/sshd_config.d/*.conf` line and
+  sets `PermitRootLogin yes` and `PasswordAuthentication yes` in `sshd_config` itself. A drop-in file
+  with the hardening was valid by `sshd -t`, reloaded without an error, and not read at all:
+  `sshd -T` still showed both as `yes`. For sshd the first value obtained wins, so the `Include` line
+  goes at the top of `sshd_config`, before those settings.
 - **Backup**: the chain file and the `<chain>.pending` next to it, and the onion service keys.
   `ChainFile` writes both files atomically, by writing and renaming (ADR 0003, "Persistence"), so a
   copy taken while the node runs is a whole file. A lost chain can also be synchronised again from

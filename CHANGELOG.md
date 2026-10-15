@@ -6,6 +6,11 @@ Version 0.5.0 (unreleased)
 
 CHANGED:
 
+- `docs/launch/infrastructure.md`, section 6: after every change to the SSH configuration, the values
+  in effect are read with `sshd -T`, not only checked with `sshd -t` (#191). On the first seed node
+  a hardening drop-in was valid and reloaded and still not read, because the provider's image has no
+  `Include` line for `sshd_config.d`
+
 - `docs/launch/infrastructure.md` says where the seed nodes stand (#188): three at three providers in
   three countries under three legal orders - 1984 Hosting in Iceland, the maintainer's favourite,
   Exoscale in Switzerland and TransIP in the Netherlands - plus the maintainer's node at home,
