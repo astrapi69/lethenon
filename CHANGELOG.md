@@ -38,6 +38,17 @@ CHANGED:
 
 ADDED:
 
+- the test network's seed nodes are in the code (#197). A node started without `--peer` dials them:
+  seed node 1's IP address, or with `--proxy` its onion address, so that a node behind Tor stays
+  inside Tor. `TestNetworkSeeds` names them with the genesis hash of the chain they serve, and a node
+  dials them only for an empty chain file or for that chain; a node on a test chain of its own does
+  not. `--no-default-peers` turns them off. With peers, given or default, `node --mine` on an empty
+  chain file takes the genesis from a peer instead of mining a new one, so that a newcomer joins the
+  test network rather than starting a chain the seed would refuse; a test chain of one's own is
+  started with `--no-default-peers --mine`. The start line says where the peers came from. Measured
+  in `TestNetworkSeedsTest`, `DefaultPeersTest` and `TestNetworkSeedsOnTheCommandLineTest`, which
+  reach a seed only through the test SOCKS5 server; a watcher on `ss` saw no connection to the real
+  seed during the whole suite
 - a running node prints a status line, once a minute by default (#149): its height, the hash of its
   tip, the connected peers with the outgoing and incoming connections it holds, the anonymity
   zone's peers where there is a zone, the waiting transfers, the blocks it mined, and how many

@@ -22,3 +22,10 @@ start day (ADR 0005).
 `chain-lethenon-1.lethenon` is the chain file as an earlier build wrote it, 698 bytes, under
 `lethenon-1` (commit 2e1076c, 2026-10-01). It is not regenerated: it is the evidence that a chain
 started under the rules before 0.4.0 is refused, and with that reason, by this build (#137).
+
+`lethenon-test-2-genesis.lethenon` is the genesis block of the test network that runs since
+2026-10-15, 220 bytes, the first block of the maintainer's chain at home. Its hash,
+`0093b8db1a0cf9be2d5203659d80b42f105d2e322a1850f13da26579df411d6e`, is the one seed node 1 announced in
+its HELLO on the same day, read with a probe that sends a HELLO and decodes the answer. It is not
+regenerated: it is the chain `TestNetworkSeeds` names (#197), and when the test network starts anew,
+it is replaced together with that class.
