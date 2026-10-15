@@ -72,11 +72,11 @@ class NodeCommandTest extends AbstractCliTest
 	}
 
 	@Test
-	@DisplayName("node --mine on an empty file starts a test chain and mines on it")
+	@DisplayName("node --mine --no-default-peers on an empty file starts a test chain and mines on it")
 	void mineOnAnEmptyFile_startsATestChainAndMines() throws IOException
 	{
 		assertEquals(0, run(password, "node", "--chain", chain.toString(), "--listen", "0",
-			"--mine", "--wallet", wallet, "--for", "2"), err);
+			"--no-default-peers", "--mine", "--wallet", wallet, "--for", "2"), err);
 
 		List<BlockBody> blocks = new ChainFile(chain).require();
 		assertEquals(Chain.TEST_IDENTIFIER, blocks.getFirst().chainIdentifier());
@@ -131,11 +131,11 @@ class NodeCommandTest extends AbstractCliTest
 	}
 
 	@Test
-	@DisplayName("an empty file without --mine or --peer fails with a message")
+	@DisplayName("an empty file without --mine, --peer or default peers fails with a message")
 	void anEmptyFileWithNothingToStartFrom_fails()
 	{
-		assertEquals(1, run("", "node", "--chain", chain.toString(), "--listen", "0", "--for",
-			"1"), out);
+		assertEquals(1, run("", "node", "--chain", chain.toString(), "--listen", "0",
+			"--no-default-peers", "--for", "1"), out);
 		assertTrue(err.contains("--peer"), err);
 		assertTrue(err.contains("--mine"), err);
 	}
