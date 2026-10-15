@@ -58,9 +58,10 @@ import io.github.astrapi69.lethenon.Bytes;
 class DiscoveryTest
 {
 
-	private static final PeerAddress IN_HANDSHAKE = new PeerAddress("127.0.0.1", 18481);
+	/** Documentation addresses (RFC 5737): a local one never enters the book (#194) */
+	private static final PeerAddress IN_HANDSHAKE = new PeerAddress("198.51.100.1", 18481);
 
-	private static final PeerAddress NEW = new PeerAddress("127.0.0.1", 18482);
+	private static final PeerAddress NEW = new PeerAddress("198.51.100.1", 18482);
 
 	@Test
 	@DisplayName("an address in its handshake is not dialled again, a new one is")

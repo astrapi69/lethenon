@@ -58,7 +58,8 @@ class OutgoingRefillTest
 	{
 		List<Node> others = new ArrayList<>();
 		List<Socket> held = new CopyOnWriteArrayList<>();
-		try (Node hub = Node.on(genesis).discoverPeers(false); Node newcomer = Node.on(genesis);
+		try (Node hub = Node.on(genesis).discoverPeers(false).keepingLocalAddresses();
+			Node newcomer = Node.on(genesis).keepingLocalAddresses();
 			ServerSocket silent = new ServerSocket(0))
 		{
 			Thread.ofVirtual().start(() -> holdEveryConnection(silent, held));

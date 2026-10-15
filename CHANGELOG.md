@@ -52,6 +52,19 @@ ADDED:
 
 FIXED:
 
+- a node neither learns nor passes on loopback and private addresses, whatever its configuration
+  (#194), after Monero's `sanitize_peerlist` and `is_host_allowed`. A seed node whose onion service
+  forwards to its ordinary port sees every connection through Tor arrive from 127.0.0.1; it confirmed
+  `127.0.0.1:<port>` as the peer's address and passed it on in answer to `GET_PEERS`. The node behind
+  Tor dialled its own address back through Tor, and every other node that asked would have dialled a
+  port on its own machine. The address book now refuses, whether heard of or confirmed, IP literals
+  in the loopback, unspecified, private (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fc00::/7) and
+  link-local ranges, and the name `localhost`. A host name is never looked up, because the lookup
+  would leave the node outside Tor. A peer given with `--peer` is still dialled. Unlike Monero's
+  `--allow-local-ip` there is no option: only the tests, which run several nodes on 127.0.0.1, keep
+  local addresses, through a package-private switch. Measured in `LocalAddressesTest` and
+  `PeerExchangeTest`; with the filter switched off, the 21 local cases and the two node tests fail
+  and the 16 reachable ones pass
 - the README called proof of pun "CPU-friendly on purpose" and gave it Monero's reasoning for RandomX,
   "designed to make the use of mining-specific hardware unfeasible" (#186). Proof of pun is SHA-256
   proof of work with the pun and a counter in place of a nonce; SHA-256 is not memory-hard and resists
