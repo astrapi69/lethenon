@@ -225,4 +225,13 @@ final class Discovery
 	{
 		return book.heardOf();
 	}
+
+	/**
+	 * Keeps and passes on local addresses as well, for nodes that find each other on one machine
+	 * (#194)
+	 */
+	void keepLocalAddresses()
+	{
+		book.keepLocalAddresses();
+	}
 }

@@ -1132,6 +1132,19 @@ public final class Node implements AutoCloseable
 		return discovery.heardOf();
 	}
 
+	/**
+	 * Keeps and passes on loopback and private addresses, which a node otherwise never does
+	 * (#194): for nodes that find each other on one machine, which only the tests run. Unlike
+	 * Monero's {@code --allow-local-ip}, the command line has no option for it.
+	 *
+	 * @return this node
+	 */
+	Node keepingLocalAddresses()
+	{
+		discovery.keepLocalAddresses();
+		return this;
+	}
+
 	private Optional<String> refusalOf(final Hello theirs)
 	{
 		Hello ours = Hello.of(chain());

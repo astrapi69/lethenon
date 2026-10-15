@@ -36,6 +36,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
@@ -79,8 +80,9 @@ class PeerExchangeTest
 	@DisplayName("two nodes that know only a third find each other through it")
 	void twoNodesThatKnowOnlyAThird_findEachOther() throws IOException
 	{
-		try (Node hub = Node.on(genesis); Node first = Node.on(genesis);
-			Node second = Node.on(genesis))
+		try (Node hub = Node.on(genesis).keepingLocalAddresses();
+			Node first = Node.on(genesis).keepingLocalAddresses();
+			Node second = Node.on(genesis).keepingLocalAddresses())
 		{
 			int hubPort = hub.listen(0);
 			first.listen(0);
@@ -115,7 +117,7 @@ class PeerExchangeTest
 	@DisplayName("a command that handed over a transfer is never passed on as a peer")
 	void aCommandThatHandedOverATransfer_isNeverPassedOn() throws IOException
 	{
-		try (Node node = Node.on(genesis); Node listening = Node.on(genesis))
+		try (Node node = Node.on(genesis).keepingLocalAddresses(); Node listening = Node.on(genesis))
 		{
 			int port = node.listen(0);
 			int listeningPort = listening.listen(0);
@@ -137,7 +139,8 @@ class PeerExchangeTest
 	void aNodeKeepsAtMostTwelveOutgoing_howeverManyItLearnsOf() throws IOException
 	{
 		List<Node> others = new ArrayList<>();
-		try (Node hub = Node.on(genesis).discoverPeers(false); Node newcomer = Node.on(genesis))
+		try (Node hub = Node.on(genesis).discoverPeers(false).keepingLocalAddresses();
+			Node newcomer = Node.on(genesis).keepingLocalAddresses())
 		{
 			int hubPort = hub.listen(0);
 			for (int index = 0; index < Node.MAXIMUM_OUTGOING + 2; index++)
@@ -200,17 +203,70 @@ class PeerExchangeTest
 	void theBook_passesOnOnlyConfirmedAddresses()
 	{
 		PeerBook book = new PeerBook();
-		book.heard(List.of(new PeerAddress("10.0.0.1", 1)));
+		book.heard(List.of(new PeerAddress("198.51.100.1", 1)));
 		for (int port = 1; port <= PeerList.LIMIT + 10; port++)
 		{
-			book.confirmed(new PeerAddress("10.0.0.2", port));
+			book.confirmed(new PeerAddress("198.51.100.2", port));
 		}
 
 		List<PeerAddress> shared = book.shareable();
 
 		assertEquals(PeerList.LIMIT, shared.size());
-		assertEquals(new PeerAddress("10.0.0.2", PeerList.LIMIT + 10), shared.getLast());
-		assertTrue(shared.stream().noneMatch(address -> address.host().equals("10.0.0.1")));
+		assertEquals(new PeerAddress("198.51.100.2", PeerList.LIMIT + 10), shared.getLast());
+		assertTrue(shared.stream().noneMatch(address -> address.host().equals("198.51.100.1")));
+	}
+
+	@Test
+	@DisplayName("a node accepted from 127.0.0.1, as one through an onion service is, is not passed on (#194)")
+	void aNodeAcceptedFromLoopback_isNotPassedOn() throws IOException
+	{
+		try (Node seed = Node.on(genesis); Node behindTor = Node.on(genesis))
+		{
+			int port = seed.listen(0);
+			behindTor.listen(0);
+			behindTor.connect("127.0.0.1", port);
+			await("the connection", () -> seed.peers().size() == 1);
+
+			assertEquals(List.of(), askForPeers(port));
+		}
+	}
+
+	@Test
+	@DisplayName("of the addresses a peer passes on, a node keeps neither 127.0.0.1 nor one from 10.0.0.0/8 (#194)")
+	void learntAddresses_keepNeitherLoopbackNorPrivate() throws IOException
+	{
+		PeerAddress reachable = new PeerAddress("198.51.100.7", 18480);
+		try (Node node = Node.on(genesis).discoverPeers(false);
+			ServerSocket server = new ServerSocket(0))
+		{
+			node.connect("127.0.0.1", server.getLocalPort());
+			try (Socket peer = server.accept())
+			{
+				peer.setSoTimeout(10_000);
+				DataInputStream in = new DataInputStream(peer.getInputStream());
+				DataOutputStream out = new DataOutputStream(peer.getOutputStream());
+				Frames.write(out,
+					new Frame(MessageType.HELLO, Hello.of(genesis, 18480, 42L).encode()));
+				readUntil(in, MessageType.GET_PEERS);
+
+				Frames.write(out, new Frame(MessageType.PEERS,
+					new PeerList(List.of(new PeerAddress("127.0.0.1", 18481),
+						new PeerAddress("10.0.0.1", 18482), reachable)).encode()));
+
+				await("the reachable address", () -> node.heardOf().contains(reachable));
+				assertEquals(List.of(reachable), node.heardOf());
+			}
+		}
+	}
+
+	private static void readUntil(final DataInputStream in, final MessageType type)
+		throws IOException
+	{
+		Frame frame = Frames.read(in, Frames.MAXIMUM_FRAME);
+		while (frame.type() != type)
+		{
+			frame = Frames.read(in, Frames.MAXIMUM_FRAME);
+		}
 	}
 
 	private List<PeerAddress> askForPeers(final int port) throws IOException

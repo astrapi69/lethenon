@@ -36,7 +36,8 @@ import java.util.Set;
  * address it has itself been connected to, and one it has only heard of from a peer
  * <p>
  * Only the first kind is passed on. An address heard of becomes the first kind when a connection
- * to it succeeds, and is forgotten when one fails.
+ * to it succeeds, and is forgotten when one fails. A local address ({@link PeerAddress#isLocal()})
+ * is neither kind: no other node reaches it, so it is not kept and never passed on (#194).
  */
 final class PeerBook
 {
@@ -53,11 +54,27 @@ final class PeerBook
 
 	private final Set<PeerAddress> itself = new LinkedHashSet<>();
 
+	private boolean keepsLocal;
+
 	/**
-	 * An address this node has been connected to; it moves to the newest end
+	 * Keeps local addresses as well, which a book otherwise refuses (#194): for nodes that find
+	 * each other on one machine, which only the tests run
+	 */
+	synchronized void keepLocalAddresses()
+	{
+		keepsLocal = true;
+	}
+
+	/**
+	 * An address this node has been connected to; it moves to the newest end. A local one is not
+	 * kept.
 	 */
 	synchronized void confirmed(final PeerAddress address)
 	{
+		if (!admits(address))
+		{
+			return;
+		}
 		heard.remove(address);
 		confirmed.remove(address);
 		confirmed.add(address);
@@ -66,13 +83,13 @@ final class PeerBook
 
 	/**
 	 * Addresses a peer passed on; an address already confirmed, or known to be this node, is not
-	 * added again
+	 * added again, and a local one not at all
 	 */
 	synchronized void heard(final List<PeerAddress> addresses)
 	{
 		for (PeerAddress address : addresses)
 		{
-			if (!confirmed.contains(address) && !itself.contains(address))
+			if (admits(address) && !confirmed.contains(address) && !itself.contains(address))
 			{
 				heard.add(address);
 			}
@@ -129,6 +146,15 @@ final class PeerBook
 	synchronized List<PeerAddress> heardOf()
 	{
 		return List.copyOf(heard);
+	}
+
+	/**
+	 * Monero's {@code is_host_allowed} and {@code sanitize_peerlist}: no loopback or private
+	 * address, by which no other node reaches the one it names
+	 */
+	private boolean admits(final PeerAddress address)
+	{
+		return keepsLocal || !address.isLocal();
 	}
 
 	private static void trim(final LinkedHashSet<PeerAddress> addresses, final int limit)
