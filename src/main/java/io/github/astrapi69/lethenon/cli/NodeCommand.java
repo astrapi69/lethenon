@@ -49,6 +49,7 @@ import io.github.astrapi69.lethenon.transport.Miner;
 import io.github.astrapi69.lethenon.transport.Node;
 import io.github.astrapi69.lethenon.transport.Outbound;
 import io.github.astrapi69.lethenon.transport.PeerAddress;
+import io.github.astrapi69.lethenon.transport.TestNetworkSeeds;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -73,7 +74,8 @@ class NodeCommand implements Callable<Integer>
 	@Option(names = "--listen", required = true, description = "the TCP port, 0 for any free one")
 	int listen;
 
-	@Option(names = "--peer", description = "host:port of a peer; repeat for more, at most 12")
+	@Option(names = "--peer", description = "host:port of a peer; repeat for more, at most 12. "
+		+ "Without one, the node dials the test network's seed nodes (--no-default-peers)")
 	List<String> peers = new ArrayList<>();
 
 	@Option(names = "--proxy", description = "host:port of a SOCKS5 proxy, for Tor usually "
@@ -100,6 +102,10 @@ class NodeCommand implements Callable<Integer>
 	@Option(names = "--no-discovery", description = "stay with the peers given by --peer and do "
 		+ "not connect to addresses learnt from them; the node still passes on what it knows")
 	boolean noDiscovery;
+
+	@Option(names = "--no-default-peers", description = "without --peer, dial nobody instead of the "
+		+ "test network's seed nodes; for a test chain of one's own")
+	boolean noDefaultPeers;
 
 	@Option(names = "--mine", description = "mine on the node's pool and pay the wallet")
 	boolean mine;
@@ -142,14 +148,30 @@ class NodeCommand implements Callable<Integer>
 		}
 	}
 
+	/**
+	 * The peers this node dials: the ones given with --peer; without any, the test network's seed
+	 * nodes, unless --no-default-peers says no or the chain is one of its own (#197). --tx-proxy
+	 * alone does not count as Tor here: an onion peer given that way joins the anonymity zone, which
+	 * carries no chain.
+	 */
+	static List<PeerAddress> peersToDial(final List<PeerAddress> given, final boolean noDefaultPeers,
+		final boolean throughTor, final List<BlockBody> chain)
+	{
+		if (!given.isEmpty() || noDefaultPeers || !TestNetworkSeeds.serve(chain))
+		{
+			return given;
+		}
+		return TestNetworkSeeds.reachedThrough(throughTor);
+	}
+
 	private int run(final PrintStream out) throws IOException
 	{
 		if (mine && wallet == null)
 		{
 			throw new IllegalArgumentException("--mine pays a wallet: name it with --wallet");
 		}
-		List<PeerAddress> addresses = peers.stream().map(PeerAddress::parse).toList();
-		ChainCommand.refuseAnOnionPeerWithoutTor(addresses, proxy != null || txProxy != null,
+		List<PeerAddress> given = peers.stream().map(PeerAddress::parse).toList();
+		ChainCommand.refuseAnOnionPeerWithoutTor(given, proxy != null || txProxy != null,
 			"--proxy, or with --tx-proxy for the anonymity zone");
 		Outbound outbound = proxy == null ? Outbound.DIRECT
 			: Outbound.through(PeerAddress.parse(proxy));
@@ -157,7 +179,12 @@ class NodeCommand implements Callable<Integer>
 			.openWallet(wallet, ChainCommand.firstLineOfStandardInput())
 			.spendKey(SignatureSuite.ED25519) : null;
 		ChainFile file = new ChainFile(chain);
-		if (file.read().isEmpty())
+		List<BlockBody> existing = file.read();
+		List<PeerAddress> addresses = peersToDial(given, noDefaultPeers, proxy != null, existing);
+		String configured = given.isEmpty() && !addresses.isEmpty()
+			? addresses.size() + " default seed node(s) of " + Chain.TEST_IDENTIFIER
+			: addresses.size() + " peer(s) configured";
+		if (existing.isEmpty())
 		{
 			file.write(start(addresses, beneficiary, outbound, out));
 		}
@@ -170,7 +197,7 @@ class NodeCommand implements Callable<Integer>
 			node.connectAll(addresses);
 			out.println("node on " + Chain.TEST_IDENTIFIER + ", listening on "
 				+ node.listeningOn().getHostAddress() + " port " + port + ", "
-				+ addresses.size() + " peer(s) configured, connecting " + outbound + zone
+				+ configured + ", connecting " + outbound + zone
 				+ (mine ? ", mining for " + ChainCommand.hex(beneficiary) : ""));
 			Stop stop = Stop.onShutdown();
 			try
@@ -406,8 +433,9 @@ class NodeCommand implements Callable<Integer>
 	}
 
 	/**
-	 * The genesis block of an empty chain file: mined with --mine, otherwise taken from the first
-	 * peer that answers
+	 * The genesis block of an empty chain file: taken from the first peer that answers, and mined
+	 * with --mine only when there is no peer to take it from, so that a newcomer's node --mine joins
+	 * the test network instead of starting a chain of its own (#197)
 	 */
 	private List<BlockBody> start(final List<PeerAddress> addresses, final Bytes beneficiary,
 		final Outbound outbound, final PrintStream out) throws IOException
@@ -419,17 +447,23 @@ class NodeCommand implements Callable<Integer>
 				+ Chain.TEST_IDENTIFIER);
 			return List.of(anchored.get());
 		}
+		if (!addresses.isEmpty())
+		{
+			return genesisFromAPeer(addresses, outbound, out);
+		}
 		if (beneficiary != null)
 		{
 			BlockBody genesis = Genesis.start(Chain.TEST_IDENTIFIER, pun, System.currentTimeMillis());
 			out.println("mined the genesis block of " + Chain.TEST_IDENTIFIER);
 			return List.of(genesis);
 		}
-		if (addresses.isEmpty())
-		{
-			throw new IllegalArgumentException(chain + " is empty: start a test chain with --mine, "
-				+ "or take one from a node with --peer");
-		}
+		throw new IllegalArgumentException(chain + " is empty: start a test chain with --mine, "
+			+ "or take one from a node with --peer");
+	}
+
+	private static List<BlockBody> genesisFromAPeer(final List<PeerAddress> addresses,
+		final Outbound outbound, final PrintStream out) throws IOException
+	{
 		List<String> reasons = new ArrayList<>();
 		for (PeerAddress address : addresses)
 		{

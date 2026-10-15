@@ -38,6 +38,17 @@ CHANGED:
 
 ADDED:
 
+- the test network's seed nodes are in the code (#197). A node started without `--peer` dials them:
+  seed node 1's IP address, or with `--proxy` its onion address, so that a node behind Tor stays
+  inside Tor. `TestNetworkSeeds` names them with the genesis hash of the chain they serve, and a node
+  dials them only for an empty chain file or for that chain; a node on a test chain of its own does
+  not. `--no-default-peers` turns them off. With peers, given or default, `node --mine` on an empty
+  chain file takes the genesis from a peer instead of mining a new one, so that a newcomer joins the
+  test network rather than starting a chain the seed would refuse; a test chain of one's own is
+  started with `--no-default-peers --mine`. The start line says where the peers came from. Measured
+  in `TestNetworkSeedsTest`, `DefaultPeersTest` and `TestNetworkSeedsOnTheCommandLineTest`, which
+  reach a seed only through the test SOCKS5 server; a watcher on `ss` saw no connection to the real
+  seed during the whole suite
 - the command line distribution is a release artifact (#196). `./gradlew releaseDistribution` builds
   what `installDist` builds as `lethenon-X.Y.Z.zip` and, compressed now, `lethenon-X.Y.Z.tar.gz`. Next
   to each it writes a SHA-256 and a SHA-512 file in the format `sha256sum -c` reads, the family's
