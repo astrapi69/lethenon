@@ -27,15 +27,17 @@ serve_and_sync "$L6" 0.6.0 "$W/n6.lethenon" 28601 "$L5" 0.5.0
 serve_and_sync "$L5" 0.5.0 "$W/n5.lethenon" 28501 "$L6" 0.6.0
 
 # blocks across versions: a node of one version mines, a node of the other is its peer and takes them
-mine_into() { # miner-cli miner-version peer-cli peer-version chain port wallet
-  cp "$5" "$W/peer-$4.lethenon"; cp "$5" "$W/miner-$2.lethenon"
-  local before; before=$(height "$3" "$W/peer-$4.lethenon" "$7")
-  "$3" node --chain "$W/peer-$4.lethenon" --listen "$6" --no-discovery --for 40 > "$W/peer-$4.out" 2>&1 &
+mine_into() { # miner-cli miner-version peer-cli peer-version miner-chain peer-chain port wallet
+  # the miner starts from the chain in its format, the peer from the same chain in its own format,
+  # which it took itself with sync above: across this version step one cannot read the other's file
+  cp "$5" "$W/miner-$2.lethenon"; cp "$6" "$W/peer-$4.lethenon"
+  local before; before=$(height "$3" "$W/peer-$4.lethenon" "$8")
+  "$3" node --chain "$W/peer-$4.lethenon" --listen "$7" --no-discovery --no-default-peers --for 40 > "$W/peer-$4.out" 2>&1 &
   local peer=$!
-  for i in $(seq 1 60); do ss -tln | grep -q ":$6 " && break; sleep 0.5; done
-  printf '%s\n' "$PW" | "$1" node --chain "$W/miner-$2.lethenon" --listen 0 --peer "127.0.0.1:$6" --no-discovery --mine --wallet "$7" --for 25 > "$W/miner-$2.out" 2>&1
+  for i in $(seq 1 60); do ss -tln | grep -q ":$7 " && break; sleep 0.5; done
+  printf '%s\n' "$PW" | "$1" node --chain "$W/miner-$2.lethenon" --listen 0 --peer "127.0.0.1:$7" --no-discovery --mine --wallet "$8" --for 25 > "$W/miner-$2.out" 2>&1
   wait $peer
-  row "$4" "takes the blocks a $2 miner mines" "$(basename "$5")" - "peer before: $before, after: $(height "$3" "$W/peer-$4.lethenon" "$7"); miner after: $(height "$1" "$W/miner-$2.lethenon" "$7")"
+  row "$4" "takes the blocks a $2 miner mines" "$(basename "$5")" - "peer before: $before, after: $(height "$3" "$W/peer-$4.lethenon" "$8"); miner after: $(height "$1" "$W/miner-$2.lethenon" "$8")"
 }
-mine_into "$L6" 0.6.0 "$L5" 0.5.0 "$W/n6.lethenon" 28602 "$W/0.6.0-H.wallet"
-mine_into "$L5" 0.5.0 "$L6" 0.6.0 "$W/n5.lethenon" 28502 "$W/0.5.0-H.wallet"
+mine_into "$L6" 0.6.0 "$L5" 0.5.0 "$W/n6.lethenon" "$W/synced-by-0.5.0.lethenon" 28602 "$W/0.6.0-H.wallet"
+mine_into "$L5" 0.5.0 "$L6" 0.6.0 "$W/n5.lethenon" "$W/synced-by-0.6.0.lethenon" 28502 "$W/0.5.0-H.wallet"

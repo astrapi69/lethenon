@@ -1,8 +1,16 @@
 ## Change log
 ----------------------
 
-Version 0.6.0 (unreleased)
+Version 0.6.0
 -------------
+
+**0.6.0 keeps the chain in an SQLite database** (#202, ADR 0006). Every change is one transaction,
+synced to the disk, and every read is verified. A node or command of 0.6.0 migrates a chain file of
+0.5.0 or earlier the first time it uses it, and keeps the old file beside it as `<chain>.legacy`.
+**After that, 0.5.0 cannot read the chain any more**; it says "this build reads block encoding version
+2 and the bytes carry version 83". The wallet file, the block encoding and the network protocol do not
+change: nodes of 0.5.0 and 0.6.0 sync and mine with each other. Also in this release: a seed node no
+longer dials itself again and again (#205), and `--version` prints the build's version (#193).
 
 FORMAT:
 
@@ -25,9 +33,36 @@ FORMAT:
 - **Measured** (`docs/measurements/0006-chain-database/`): `kill -9` at random moments of a block
   write and of a rollback, and a simulated power cut at the same moments, leave the change whole or
   not at all in every run: 1,000 runs of each `kill -9` test and 5,000 disks of each power-cut test, 0
-  broken (`-PcrashRuns=1000`, Linux x86_64); the counter-runs without the transaction, and without the sync, fail. The
+  broken (`-PcrashRuns=1000`, Linux x86_64); the counter-runs without the transaction, and without
+  the sync, fail. The
   same 300 blocks wrote 99,623,517 bytes with no sync in 0.5.0 and write 7,411,060 bytes with 1,207
   syncs now. A 301-block chain with 2,990 transfers migrated block for block identical.
+- **Measured on the release, against 0.5.0, in both directions.**
+  - The command line of 0.5.0 was built from its tag, with its lethenon jar replaced by the one on
+    Maven Central and checked against Central's `.sha1` (`6cf3809bf240...`). This one was built from
+    the release commit with the full gate (`./gradlew clean build`: 84 classes, 831 tests, 0 failures).
+  - Each version wrote a test chain of four blocks: an Ed25519 transfer of 12.5 LETH, 20 LETH to a
+    published address and its sweep, and 100 LETH to the holder's ML-DSA-65 account with 5 LETH from
+    it. Both compute the recipient's 17.5 LETH and the address owner's 20 LETH on their own chains.
+  - **0.6.0 on a chain of 0.5.0**, with a transfer of 7 LETH still waiting in 0.5.0's pool:
+    - The first `balance` migrates it: the same 17.5 and 20 LETH, now in an SQLite database.
+    - `.legacy` and `.pending.legacy` are byte for byte the 0.5.0 files, and 0.5.0 reads the `.legacy`
+      copy (17.5 LETH).
+    - The next `mine` of 0.6.0 takes the waiting transfer into block 4, and the recipient holds 7 LETH.
+  - **0.5.0 on a chain of 0.6.0:** `balance` and `mine` exit 1 with the message above, and the file
+    does not change.
+  - **Wallets in both directions:** 0.6.0 computes the balances of 0.5.0's wallets, and 0.5.0 opens a
+    wallet of 0.6.0.
+  - **The test network's chain** of 0.5.0, 681 blocks, migrates and replays, and its `.legacy` copy is
+    the old file.
+  - **The network**, in a namespace of its own (`unshare -rn`, loopback only):
+    - `sync` from a node of the other version takes the whole chain, and each version replays its
+      file to the same blocks, transfers and supply, in both directions.
+    - A miner of one version with a node of the other as its peer: the peer took every block, 214
+      blocks in each direction.
+  - Commands: `bash docs/launch/compatibility-0.6.0/build.sh <release commit>`, then
+    `bash docs/launch/compatibility-0.6.0/measure.sh [<copy of a lethenon-test-2 chain of 0.5.0>]`,
+    which writes one line per command to `results.tsv`.
 
 ADDED:
 
@@ -62,6 +97,12 @@ FIXED:
   line, which picocli's version provider reads. Measured in `LethenonCliTest`, red before the change
   with `expected: <lethenon 0.6.0-SNAPSHOT> but was: <lethenon 0.1>`, and on the installed
   distribution: `lethenon 0.6.0-SNAPSHOT`, and `lethenon 0.6.0` with `-PprojectVersion=0.6.0`
+
+KNOWN AND NOT FIXED:
+
+- `node --mine` computes on one thread (#201)
+- rarely, `OnionConnectTimeTest` fails after 10 s, and the run then hangs for most of an hour; not
+  reproduced (#212)
 
 Version 0.5.0
 -------------

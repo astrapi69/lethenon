@@ -61,7 +61,9 @@ row 0.6.0 "file kind" t6.lethenon - "$(kind "$W/t6.lethenon")"
 
 echo "## 0.6.0 on a chain of 0.5.0, with a transfer still waiting in 0.5.0's pool: migrated on first use" >> "$OUT"
 cp "$W/t5.lethenon" "$W/m.lethenon"; old=$(sha "$W/m.lethenon")
-lc 0.6.0 balance --chain "$W/m.lethenon" --wallet "$W/0.6.0-A.wallet"; r6=$(acct)
+# the 0.6.0 recipient's account is read from 0.6.0's own chain: any 0.6.0 command on m.lethenon would
+# migrate it before 0.5.0 could leave a transfer waiting in its pool
+lc 0.6.0 balance --chain "$W/t6.lethenon" --wallet "$W/0.6.0-A.wallet"; r6=$(acct)
 step 0.5.0 "send 7 (waits in 0.5.0's pool)" m.lethenon send --chain "$W/m.lethenon" --wallet "$W/0.5.0-H.wallet" --to "$r6" --amount 7
 oldpending=$(sha "$W/m.lethenon.pending")
 balances 0.6.0 "$W/m.lethenon" "first use, migrates" 0.5.0
