@@ -162,7 +162,8 @@ joins the test network instead of starting a chain of its own.
 ## 5. Keeping it running
 
 For a node that runs all the time, a systemd service under a user of its own is enough. The seed node
-runs like this:
+runs like this, except that a seed node also gives `--no-default-peers`: it is one of the seed nodes
+it would otherwise dial. Your node leaves that option out, so that it finds the network:
 
 ```ini
 # /etc/systemd/system/lethenon-node.service
