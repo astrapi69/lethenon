@@ -1,8 +1,48 @@
 ## Change log
 ----------------------
 
-Version 0.5.0 (unreleased)
+Version 0.5.0
 -------------
+
+**0.5.0 is the release somebody else can run.** The command line comes as a download on the GitHub
+release, signed by the signing subkey and with its checksums (#196). The test network's seed nodes are
+in the code, so a node finds the network without being given an address (#197). `docs/testnet.md` takes
+a newcomer from the download to a running node, with a section for the Raspberry Pi 4 and 5, and has
+been run through once on ARM64 (#198). Three fixes in the network come with it:
+- a configured peer is dialled again (#128);
+- discovery keeps an address that only this node's own limit refused (#126);
+- no node learns or passes on a loopback or private address (#194).
+
+A running node prints a status line (#149). The main chain still starts only with 1.0.0 (ADR 0005).
+
+FORMAT:
+
+- **No format changes.** The chain encoding, the wallet file, `HELLO` and the peer list are the code of
+  0.4.0, and both speak protocol version 3. What 0.5.0 writes, 0.4.0 reads, and the other way round.
+- **Measured on the release, in both directions, on chains carrying real transfers.**
+  - The command line of 0.4.0 was built from its tag, with its lethenon jar replaced by the one on
+    Maven Central and checked against Central's `.sha1` (`7e5a6139c349...`). This one was built from
+    the release commit with the full gate (`./gradlew clean build`: 82 classes, 808 tests, 0
+    failures).
+  - Each version wrote a test chain of four blocks: an Ed25519 transfer of 12.5 LETH, 20 LETH to a
+    published address and its sweep, and 100 LETH to the holder's ML-DSA-65 account with 5 LETH from
+    it. Both versions compute the recipient's 17.5 LETH and the address owner's 20 LETH on both chains,
+    each with the other version's wallets.
+  - Reading leaves the files unchanged. Each version then signed a transfer from the other version's
+    wallet onto a copy of the other's chain and mined block 4, and the writer replayed the result: 5
+    blocks, 6 transfers, the new 7 LETH where they were sent.
+  - 0.4.0 replays the test network's chain, which 0.5.0 development builds wrote since 2026-10-15:
+    424 blocks, the same result as 0.5.0.
+  - In a network namespace of their own (`unshare -rn`, loopback only), `sync` from a node of the
+    other version takes the whole chain into a file that is byte for byte the served one, in both
+    directions. A miner of one version with a node of the other as its peer: the peer took every
+    block, 216 blocks from a 0.5.0 miner into 0.4.0, 211 from a 0.4.0 miner into 0.5.0.
+- Commands: `bash docs/launch/compatibility-0.5.0/build.sh <release commit>`, then
+  `bash docs/launch/compatibility-0.5.0/measure.sh [<copy of a lethenon-test-2 chain>]`, which writes
+  one line per command to `results.tsv`.
+- **A behaviour that changed:** `node --mine` on an empty chain file with peers, given or default, takes
+  the genesis block from a peer instead of mining a new one (#197). A test chain of one's own is
+  started with `--no-default-peers --mine`, or with `mine --testnet`.
 
 CHANGED:
 
@@ -153,6 +193,17 @@ FIXED:
   that each held a secret when it was handed out and is zero-filled after the call returns: for
   writing, for reading both file layouts, and for content refused as not a wallet. The same
   counter-run now fails exactly those four
+
+
+KNOWN AND NOT FIXED:
+
+- `lethenon --version` prints "lethenon 0.1" (#193); the version is in the name of the archive and its
+  `lib/lethenon-X.Y.Z.jar`
+- the chain file is written anew, whole, after every block, without `fsync` (#202). A killed process
+  leaves the old file or the new one, never half of one: in #202, 300 runs killed with SIGKILL or
+  SIGTERM while writing all left a readable file. A power cut without `fsync` is not covered. The
+  writes grow with the chain; `docs/testnet.md` advises an SSD for a node that runs all the time
+- `node --mine` computes on one thread (#201)
 
 Version 0.4.0
 -------------
