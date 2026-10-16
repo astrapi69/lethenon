@@ -9,6 +9,11 @@ CHANGED:
 - `docs/testnet.md` points at the published 0.6.0: its section 1 ran word for word against the GitHub
   release `RELEASE-0.6.0`, and a short section says what happens to a chain file of 0.5.0 on the first
   start of 0.6.0, that 0.5.0 cannot read the chain after that, and how to keep a way back
+- the crash gate of #202 ran on ARM64 against the published 0.6.0 itself, not a build: the test
+  classes compiled at `RELEASE-0.6.0`, the classes under test from the signed distribution on the
+  GitHub release. A thousand runs per test, 0 broken (`docs/measurements/0006-chain-database/README.md`).
+  The note in the Raspberry Pi section of `docs/testnet.md` that this was being checked is gone, and
+  the section names the result
 
 Version 0.6.0
 -------------
