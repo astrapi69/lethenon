@@ -87,6 +87,10 @@ done, 1 refused with the reason on standard error, 2 a command line that was not
 
 ### A test network
 
+To run a node on it, without building anything: [docs/testnet.md](docs/testnet.md), "Join the
+testnet" - download and check, first start, Tor, mining with a test wallet, and a section for the
+Raspberry Pi 4 and 5.
+
 The test chain has a network ([ADR 0003](docs/adr/0003-test-network.md)): TCP, peers given on the
 command line and the addresses they pass on (#102), and Tor as a transport
 ([ADR 0004](docs/adr/0004-tor-transport.md)): a SOCKS5 proxy for every outgoing connection, an
