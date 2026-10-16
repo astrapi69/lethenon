@@ -71,3 +71,14 @@ a release runs them a thousand times:
 ```sh
 ./gradlew test --tests '*ChainCrashTest' --tests '*PowerCutTest' -PcrashRuns=1000
 ```
+
+On db0b4bf, 2026-10-16 08:55 to 09:19 UTC, Linux x86_64: 4 tests, 0 failures, 23 min 37 s.
+
+| test | runs | killed inside a write | broken |
+|---|---|---|---|
+| kill -9 while blocks are written | 1000 | 971 | 0 |
+| kill -9 while a fork is rolled back | 1000 | 985 | 0 |
+| power cut while blocks are written | 5000 disks from 1000 runs | 4900 | 0 |
+| power cut while a fork is rolled back | 5000 disks from 1000 runs | 4915 | 0 |
+
+Not yet run: the same on ARM64.
