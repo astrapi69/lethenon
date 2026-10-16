@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +37,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import io.github.astrapi69.lethenon.Amount;
 import io.github.astrapi69.lethenon.Bytes;
-import io.github.astrapi69.lethenon.CanonicalEncoding;
+import io.github.astrapi69.lethenon.ChainFile;
 import io.github.astrapi69.lethenon.PublishedAddress;
 import io.github.astrapi69.lethenon.Replay;
 
@@ -100,7 +99,7 @@ class StealthOnTheCommandLineTest extends AbstractCliTest
 		assertEquals(0, run(holderPassword, "mine", "--chain", chain.toString(), "--wallet",
 			holderWallet), err);
 
-		Replay replay = Replay.verify(CanonicalEncoding.readChain(Files.readAllBytes(chain)));
+		Replay replay = Replay.verify(new ChainFile(chain).read());
 
 		assertEquals(Amount.ofLeth(20L), replay.finalState().balanceOf(Bytes.ofHex(payeeAccount)),
 			"the money reached the account the recipient can spend from: " + replay.describe());

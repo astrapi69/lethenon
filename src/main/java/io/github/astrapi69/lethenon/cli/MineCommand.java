@@ -104,9 +104,8 @@ class MineCommand extends ChainCommand
 		List<BlockBody> extended = new ArrayList<>(blocks);
 		extended.add(mined);
 		Replay replay = Replay.verify(extended);
-		writeChain(extended);
 		List<SignedTransaction> left = waiting.subList(mined.transactions().size(), waiting.size());
-		writePending(left);
+		writeChain(extended, left);
 		if (ConsensusRules.LETHENON.anchorFor(mined.chainIdentifier()).map(Blocks::hashOf)
 			.filter(Blocks.hashOf(mined)::equals).isPresent())
 		{

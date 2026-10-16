@@ -48,9 +48,9 @@ import picocli.CommandLine.Option;
  * What every command that works on a chain shares: the chain file, the transfers waiting for the
  * next block, the wallet and its password, and the one place where a refusal becomes exit code 1.
  * <p>
- * The transfers waiting for a block live next to the chain, in {@code <chain>.pending}: a format
- * version byte, then each signed transfer in its canonical encoding, length first. {@code send}
- * adds to it, {@code mine} empties it into a block. It is not part of the chain and nobody has to
+ * The transfers waiting for a block live in the chain's database beside the blocks (ADR 0006), each
+ * signed transfer in its canonical encoding. {@code send} adds to them, {@code mine} empties them
+ * into a block, and writes the block and what still waits in one transaction. It is not part of the chain and nobody has to
  * trust it: a block made from it is replayed before it is written, and a transfer that does not
  * hold makes {@code mine} refuse rather than write a chain that would not verify.
  */
@@ -171,16 +171,19 @@ abstract class ChainCommand implements Callable<Integer>
 	}
 
 	/**
-	 * Writes the chain, atomically - see {@link ChainFile}
+	 * Writes the chain and the transfers still waiting, in one transaction - see {@link ChainFile}
 	 *
 	 * @param blocks
 	 *            the whole chain
+	 * @param transfers
+	 *            all the transfers still waiting
 	 * @throws IOException
-	 *             if it cannot be written
+	 *             if they cannot be written; then nothing of them is
 	 */
-	void writeChain(final List<BlockBody> blocks) throws IOException
+	void writeChain(final List<BlockBody> blocks, final List<SignedTransaction> transfers)
+		throws IOException
 	{
-		chainFile().write(blocks);
+		chainFile().write(blocks, transfers);
 	}
 
 	/**

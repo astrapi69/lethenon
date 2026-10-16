@@ -147,6 +147,35 @@ final class TestChains
 	}
 
 	/**
+	 * A chain made longer by empty blocks at the lowest difficulty, each paying {@link #MINER}: a
+	 * chain to store rather than to replay, cheap to mine by the hundred, and a fork when it extends
+	 * a prefix of another chain with other words
+	 *
+	 * @param chain
+	 *            the chain to extend, genesis first, not empty
+	 * @param blocks
+	 *            how many blocks to add
+	 * @param puns
+	 *            the words of the added blocks, followed by each block's height
+	 * @return the longer chain
+	 */
+	static List<BlockBody> extended(final List<BlockBody> chain, final int blocks,
+		final String puns)
+	{
+		List<BlockBody> longer = new ArrayList<>(chain);
+		for (int added = 0; added < blocks; added++)
+		{
+			BlockBody previous = longer.getLast();
+			longer.add(Blocks
+				.mine(new BlockBody(previous.chainIdentifier(), previous.height() + 1L,
+					Blocks.hashOf(previous), MINER, List.of(), previous.timestamp() + 60_000L,
+					DifficultyRule.MINIMUM, puns + " " + longer.size()), 1_000_000L)
+				.orElseThrow());
+		}
+		return longer;
+	}
+
+	/**
 	 * A test chain whose block 1 pays the holder, and one mined block per transfer after it, each
 	 * paying {@link #MINER}
 	 *

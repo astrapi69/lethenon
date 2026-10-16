@@ -24,24 +24,25 @@
  */
 package io.github.astrapi69.lethenon;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
- * A chain on disk, and the transfers waiting for its next block in a file next to it (lethenon#32).
+ * A chain on disk, and the transfers waiting for its next block (lethenon#32, #202).
  * <p>
- * The chain file holds the canonical encoding of the blocks and nothing else. The waiting
- * transfers live in {@code <chain>.pending}: a version byte, the number of transfers, then each
- * transfer as its length and its canonical encoding, in the order they were signed. Both are
- * written through a file next to the target and an atomic move, so a crash leaves the old content
- * or the new one and never half of either.
+ * Since 0.6.0 the file at the chain's path is an SQLite database (ADR 0006). Every change is one
+ * transaction: a new block, a rollback over a fork of any depth, and the waiting transfers written
+ * with them are on the disk whole or not at all, after a killed process as after a power cut.
+ * Every read verifies the chain against its hashes before it returns it, and a database that does
+ * not verify is refused, not used.
+ * <p>
+ * A chain file of an earlier version is migrated the first time it is read or written: copied into
+ * the database, compared block by block, and kept beside it as {@code <chain>.legacy} (see
+ * {@link ChainMigration}).
  * <p>
  * The command line and the desktop plugin both read and write chains through this class, so there
  * is one format and one way to write it.
@@ -49,16 +50,20 @@ import java.util.Objects;
 public final class ChainFile
 {
 
-	/** The version of the pending file described above */
+	/**
+	 * The version of the pending file of 0.5.0 and earlier, {@code <chain>.pending}: a version
+	 * byte, the number of transfers, then each transfer as its length and its canonical encoding.
+	 * Read when such a chain is migrated, never written
+	 */
 	public static final byte PENDING_VERSION = 1;
 
 	private final Path chain;
 
 	/**
-	 * A chain file at the given path, which need not exist yet
+	 * A chain at the given path, which need not exist yet
 	 *
 	 * @param chain
-	 *            the chain file
+	 *            the chain's file
 	 */
 	public ChainFile(final Path chain)
 	{
@@ -66,19 +71,19 @@ public final class ChainFile
 	}
 
 	/**
-	 * The chain as the file holds it, empty when there is no file yet
+	 * The chain, verified; empty when there is none yet
 	 *
 	 * @return the blocks, genesis first
 	 * @throws IOException
-	 *             if the file cannot be read
+	 *             if it cannot be read, or does not verify
 	 */
 	public List<BlockBody> read() throws IOException
 	{
-		if (!Files.exists(chain))
+		if (!databaseExists())
 		{
 			return List.of();
 		}
-		return CanonicalEncoding.readChain(Files.readAllBytes(chain));
+		return database().blocks();
 	}
 
 	/**
@@ -88,7 +93,7 @@ public final class ChainFile
 	 * @throws IllegalArgumentException
 	 *             when there is no chain yet
 	 * @throws IOException
-	 *             if the file cannot be read
+	 *             if it cannot be read, or does not verify
 	 */
 	public List<BlockBody> require() throws IOException
 	{
@@ -102,89 +107,107 @@ public final class ChainFile
 	}
 
 	/**
-	 * Writes the whole chain, replacing what the file held
+	 * Writes the chain in one transaction, leaving the waiting transfers as they are
 	 *
 	 * @param blocks
 	 *            the whole chain, genesis first
 	 * @throws IOException
-	 *             if it cannot be written
+	 *             if it cannot be written; then nothing of it is
 	 */
 	public void write(final List<BlockBody> blocks) throws IOException
 	{
-		writeReplacing(chain, CanonicalEncoding.encodeChain(blocks));
+		change(Objects.requireNonNull(blocks), null);
+	}
+
+	/**
+	 * Writes the chain and the transfers waiting for its next block, in one transaction
+	 *
+	 * @param blocks
+	 *            the whole chain, genesis first
+	 * @param transfers
+	 *            all the transfers to wait, in order
+	 * @throws IOException
+	 *             if they cannot be written; then nothing of them is
+	 */
+	public void write(final List<BlockBody> blocks, final List<SignedTransaction> transfers)
+		throws IOException
+	{
+		change(Objects.requireNonNull(blocks), Objects.requireNonNull(transfers));
 	}
 
 	/**
 	 * The transfers waiting for the next block
 	 *
-	 * @return the transfers, in the order they were signed; none when there is no pending file
-	 * @throws IllegalArgumentException
-	 *             when the pending file is of another version
+	 * @return the transfers, in the order they were signed; none when there is no chain yet
 	 * @throws IOException
-	 *             if the file cannot be read
+	 *             if they cannot be read
 	 */
 	public List<SignedTransaction> readPending() throws IOException
 	{
-		Path file = pendingFile();
-		if (!Files.exists(file))
+		if (!databaseExists())
 		{
 			return List.of();
 		}
-		ByteBuffer buffer = ByteBuffer.wrap(Files.readAllBytes(file));
-		byte version = buffer.get();
-		if (version != PENDING_VERSION)
-		{
-			throw new IllegalArgumentException(file + " is pending-file version " + version
-				+ " and this build reads version " + PENDING_VERSION);
-		}
-		int count = buffer.getInt();
-		List<SignedTransaction> transfers = new ArrayList<>(count);
-		for (int index = 0; index < count; index++)
-		{
-			byte[] encoded = new byte[buffer.getInt()];
-			buffer.get(encoded);
-			transfers.add(CanonicalEncoding.readSignedTransaction(encoded));
-		}
-		return transfers;
+		return database().waiting();
 	}
 
 	/**
-	 * Replaces the transfers waiting for the next block
+	 * Replaces the transfers waiting for the next block, in one transaction
 	 *
 	 * @param transfers
-	 *            all of them; none removes the pending file
+	 *            all of them; none leaves none waiting
 	 * @throws IOException
-	 *             if it cannot be written
+	 *             if they cannot be written
 	 */
 	public void writePending(final List<SignedTransaction> transfers) throws IOException
 	{
-		if (transfers.isEmpty())
-		{
-			Files.deleteIfExists(pendingFile());
-			return;
-		}
-		ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-		bytes.write(PENDING_VERSION);
-		bytes.writeBytes(ByteBuffer.allocate(Integer.BYTES).putInt(transfers.size()).array());
-		for (SignedTransaction transfer : transfers)
-		{
-			byte[] encoded = CanonicalEncoding.encode(transfer);
-			bytes.writeBytes(ByteBuffer.allocate(Integer.BYTES).putInt(encoded.length).array());
-			bytes.writeBytes(encoded);
-		}
-		writeReplacing(pendingFile(), bytes.toByteArray());
+		change(null, Objects.requireNonNull(transfers));
 	}
 
-	private Path pendingFile()
+	/**
+	 * The settings the database runs with (ADR 0006)
+	 *
+	 * @return journal_mode, synchronous and fullfsync as SQLite reports them
+	 * @throws IOException
+	 *             if the database cannot be opened
+	 */
+	Map<String, String> settingsInForce() throws IOException
 	{
-		return chain.resolveSibling(chain.getFileName() + ".pending");
+		return database().settingsInForce();
 	}
 
-	private static void writeReplacing(final Path target, final byte[] content) throws IOException
+	private void change(final List<BlockBody> blocks, final List<SignedTransaction> transfers)
+		throws IOException
 	{
-		Path temporary = target.resolveSibling(target.getFileName() + ".writing");
-		Files.write(temporary, content);
-		Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING,
-			StandardCopyOption.ATOMIC_MOVE);
+		databaseExists();
+		database().change(blocks, transfers);
+	}
+
+	/**
+	 * Whether there is a database at the chain's path, after completing whatever migration a
+	 * chain file of an earlier version or an interrupted one asks for
+	 */
+	private boolean databaseExists() throws IOException
+	{
+		ChainMigration migration = new ChainMigration(chain);
+		if (Files.exists(chain))
+		{
+			if (!ChainDatabase.isDatabase(chain))
+			{
+				migration.run();
+			}
+			return true;
+		}
+		if (migration.wasInterruptedBeforeTheDatabaseTookItsPlace())
+		{
+			migration.finish();
+			return true;
+		}
+		return false;
+	}
+
+	private ChainDatabase database()
+	{
+		return new ChainDatabase(chain);
 	}
 }

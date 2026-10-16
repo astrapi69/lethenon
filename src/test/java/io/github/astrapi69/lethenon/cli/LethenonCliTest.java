@@ -44,8 +44,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 import io.github.astrapi69.lethenon.BlockBody;
 import io.github.astrapi69.lethenon.Blocks;
-import io.github.astrapi69.lethenon.CanonicalEncoding;
 import io.github.astrapi69.lethenon.Chain;
+import io.github.astrapi69.lethenon.ChainFile;
 import io.github.astrapi69.lethenon.Genesis;
 import io.github.astrapi69.lethenon.DifficultyRule;
 import io.github.astrapi69.lethenon.Replay;
@@ -116,7 +116,7 @@ class LethenonCliTest extends AbstractCliTest
 		assertEquals(0, run(holderPassword, "mine", "--chain", chain.toString(), "--wallet",
 			holderWallet), err);
 
-		Replay replay = Replay.verify(CanonicalEncoding.readChain(Files.readAllBytes(chain)));
+		Replay replay = Replay.verify(new ChainFile(chain).read());
 		assertEquals(4L, replay.blocks(), replay.describe());
 		assertEquals(2L, replay.transactions(), replay.describe());
 		assertEquals(0, run(restoredPassword, "balance", "--chain", chain.toString(), "--wallet",
@@ -134,7 +134,7 @@ class LethenonCliTest extends AbstractCliTest
 		assertEquals(0, run(minerPassword, "mine", "--chain", chain.toString(), "--wallet",
 			minerWallet), err);
 
-		List<BlockBody> blocks = CanonicalEncoding.readChain(Files.readAllBytes(chain));
+		List<BlockBody> blocks = new ChainFile(chain).read();
 		assertEquals(List.of(Genesis.NOBODY.toString(), holderAccount, minerAccount),
 			blocks.stream().map(block -> block.beneficiary().toString()).toList());
 		assertTrue(out.contains("mined block 2"), out);
@@ -143,8 +143,7 @@ class LethenonCliTest extends AbstractCliTest
 	@Test
 	void mine_asksTheRuleHowHard_andAfterThirtyFastBlocksMinesTwoBitsHarder() throws Exception
 	{
-		List<BlockBody> fast = new ArrayList<>(
-			CanonicalEncoding.readChain(Files.readAllBytes(chain)));
+		List<BlockBody> fast = new ArrayList<>(new ChainFile(chain).read());
 		while (fast.size() < DifficultyRule.INTERVAL)
 		{
 			BlockBody last = fast.getLast();
@@ -152,12 +151,12 @@ class LethenonCliTest extends AbstractCliTest
 				Blocks.hashOf(last), last.beneficiary(), List.of(), last.timestamp() + 1_000L,
 				DifficultyRule.requiredFor(fast), "fast"), 1_000_000L).orElseThrow());
 		}
-		Files.write(chain, CanonicalEncoding.encodeChain(fast));
+		new ChainFile(chain).write(fast);
 
 		assertEquals(0, run(holderPassword, "mine", "--chain", chain.toString(), "--wallet",
 			holderWallet), err);
 
-		List<BlockBody> blocks = CanonicalEncoding.readChain(Files.readAllBytes(chain));
+		List<BlockBody> blocks = new ChainFile(chain).read();
 		assertEquals(DifficultyRule.MINIMUM + 2, blocks.getLast().difficulty());
 		assertEquals(31L, Replay.verify(blocks).blocks());
 	}
@@ -174,7 +173,7 @@ class LethenonCliTest extends AbstractCliTest
 	}
 
 	@Test
-	void faucet_fromAWalletThatIsNotTheFirstMiner_isRefused_andNothingIsWaiting()
+	void faucet_fromAWalletThatIsNotTheFirstMiner_isRefused_andNothingIsWaiting() throws Exception
 	{
 		String password = aPassword();
 		String wallet = directory.resolve("somebody.wallet").toString();
@@ -185,11 +184,12 @@ class LethenonCliTest extends AbstractCliTest
 
 		assertEquals(1, exit, out);
 		assertTrue(err.contains("first miner"), err);
-		assertFalse(Files.exists(pending()), "a refused faucet leaves no transfer waiting");
+		assertEquals(List.of(), new ChainFile(chain).readPending(),
+			"a refused faucet leaves no transfer waiting");
 	}
 
 	@Test
-	void send_ofMoreThanTheAccountHolds_isRefused_beforeAnythingIsSigned()
+	void send_ofMoreThanTheAccountHolds_isRefused_beforeAnythingIsSigned() throws Exception
 	{
 		String password = aPassword();
 		String wallet = directory.resolve("poor.wallet").toString();
@@ -200,7 +200,7 @@ class LethenonCliTest extends AbstractCliTest
 
 		assertEquals(1, exit, out);
 		assertTrue(err.contains("holds 0.00000000"), err);
-		assertFalse(Files.exists(pending()));
+		assertEquals(List.of(), new ChainFile(chain).readPending());
 	}
 
 	@Test
@@ -222,10 +222,9 @@ class LethenonCliTest extends AbstractCliTest
 			holderWallet, "--to", holderAccount, "--amount", "1"), err);
 		assertEquals(0, run(holderPassword, "mine", "--chain", chain.toString(), "--wallet",
 			holderWallet), err);
-		// the chain file ends with the signature of the transfer in its last block
-		byte[] content = Files.readAllBytes(chain);
-		content[content.length - 1] ^= 1;
-		Files.write(chain, content);
+		// the stored block ends with the signature of its transfer, which the block's hash does not
+		// cover: the database's own checks pass, and the replay is what refuses it
+		flipTheLastByte("block", "height", chain);
 
 		int exit = run(holderPassword, "balance", "--chain", chain.toString(), "--wallet",
 			holderWallet);
@@ -248,9 +247,9 @@ class LethenonCliTest extends AbstractCliTest
 		assertEquals(0, run(holderPassword, "mine", "--chain", chain.toString(), "--wallet",
 			holderWallet), err);
 
-		Replay replay = Replay.verify(CanonicalEncoding.readChain(Files.readAllBytes(chain)));
+		Replay replay = Replay.verify(new ChainFile(chain).read());
 		assertEquals(2L, replay.transactions(), replay.describe());
-		assertFalse(Files.exists(pending()), "a mined transfer no longer waits");
+		assertEquals(List.of(), new ChainFile(chain).readPending(), "a mined transfer no longer waits");
 	}
 
 	@Test
@@ -259,9 +258,7 @@ class LethenonCliTest extends AbstractCliTest
 	{
 		assertEquals(0, run(holderPassword, "send", "--chain", chain.toString(), "--wallet",
 			holderWallet, "--to", holderAccount, "--amount", "1"), err);
-		byte[] waiting = Files.readAllBytes(pending());
-		waiting[waiting.length - 1] ^= 1;
-		Files.write(pending(), waiting);
+		flipTheLastByte("waiting", "position", chain);
 		byte[] before = Files.readAllBytes(chain);
 
 		int exit = run(holderPassword, "mine", "--chain", chain.toString(), "--wallet",
@@ -269,8 +266,9 @@ class LethenonCliTest extends AbstractCliTest
 
 		assertEquals(1, exit, out);
 		assertTrue(err.contains("signature"), err);
-		assertArrayEquals(before, Files.readAllBytes(chain));
-		assertArrayEquals(waiting, Files.readAllBytes(pending()), "nothing waiting is lost");
+		assertArrayEquals(before, Files.readAllBytes(chain),
+			"the chain and what waits beside it, the tampered transfer included, stay as they were");
+		assertEquals(1, new ChainFile(chain).readPending().size(), "nothing waiting is lost");
 	}
 
 	@Test
@@ -279,9 +277,28 @@ class LethenonCliTest extends AbstractCliTest
 		assertEquals(2, run("", "print-money"));
 	}
 
-	private Path pending()
+	/**
+	 * Flips the last byte of the newest row of a table in the chain's database, the way a disk or
+	 * a person could
+	 */
+	private static void flipTheLastByte(final String table, final String key, final Path chain)
+		throws java.sql.SQLException
 	{
-		return Path.of(chain + ".pending");
+		try (java.sql.Connection connection = java.sql.DriverManager
+			.getConnection("jdbc:sqlite:" + chain);
+			java.sql.Statement select = connection.createStatement();
+			java.sql.ResultSet newest = select.executeQuery("SELECT " + key + ", body FROM " + table
+				+ " ORDER BY " + key + " DESC LIMIT 1");
+			java.sql.PreparedStatement update = connection
+				.prepareStatement("UPDATE " + table + " SET body = ? WHERE " + key + " = ?"))
+		{
+			newest.next();
+			byte[] body = newest.getBytes(2);
+			body[body.length - 1] ^= 1;
+			update.setBytes(1, body);
+			update.setLong(2, newest.getLong(1));
+			update.executeUpdate();
+		}
 	}
 
 	private String createWallet(final String wallet, final String password)

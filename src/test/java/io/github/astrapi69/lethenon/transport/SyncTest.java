@@ -54,7 +54,6 @@ import org.junit.jupiter.api.io.TempDir;
 import io.github.astrapi69.lethenon.BlockBody;
 import io.github.astrapi69.lethenon.Blocks;
 import io.github.astrapi69.lethenon.Bytes;
-import io.github.astrapi69.lethenon.CanonicalEncoding;
 import io.github.astrapi69.lethenon.Chain;
 import io.github.astrapi69.lethenon.ChainFile;
 import io.github.astrapi69.lethenon.DifficultyRule;
@@ -244,7 +243,7 @@ class SyncTest
 	private Path fileWith(final List<BlockBody> chain) throws IOException
 	{
 		Path path = directory.resolve("chain-" + chain.size() + ".lethenon");
-		Files.write(path, CanonicalEncoding.encodeChain(chain));
+		new ChainFile(path).write(chain);
 		return path;
 	}
 
