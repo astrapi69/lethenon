@@ -200,6 +200,36 @@ journalctl -u lethenon-node -f        # the status lines
 Java ends with status 143 when systemd stops it. systemd then shows the service as `failed` until the
 next start; that is expected.
 
+## 6. Optional: a test chain of your own
+
+A chain nobody else mines on, for trying things out without waiting two minutes for a block. It runs
+under the test chain's rules and identifier, but it is a chain of its own: it never connects to the
+test network, and nothing on it reaches the seed nodes.
+
+With the command line alone, one block per command:
+
+```sh
+bin/lethenon mine --testnet --chain ~/lethenon/own.lethenon --wallet ~/lethenon/test.wallet
+bin/lethenon mine --chain ~/lethenon/own.lethenon --wallet ~/lethenon/test.wallet
+```
+
+The first `mine` starts the chain with its genesis block, whose reward goes to the burn account
+(`mined block 0: ... paying its reward to the burn account`); each further `mine` adds a block that
+pays the wallet. `--testnet` is needed only for the first one, which chooses the chain.
+
+As a node that mines on its own:
+
+```sh
+bin/lethenon node --chain ~/lethenon/own.lethenon --wallet ~/lethenon/test.wallet --mine \
+    --no-default-peers --listen 18481
+```
+
+On an empty chain file it prints `mined the genesis block of lethenon-test-2` instead of taking the
+genesis block from a seed node; without `--no-default-peers` it would join the test network. Run
+with `--for 20` on Linux x86_64 on 2026-10-16, it mined 194 blocks in 20 seconds. A second machine
+joins this chain with an empty chain file, `--peer <this machine>:18481` and `--no-default-peers`:
+it takes the genesis block from that peer.
+
 ## Raspberry Pi 4 and 5
 
 A Raspberry Pi 4 or 5 runs a node, and mines on it, with a **64-bit** operating system:

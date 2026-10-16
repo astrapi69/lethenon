@@ -37,6 +37,10 @@ CHANGED:
   the page says so. To build it yourself, it names the release tag to check out. It also says that gpg
   answers in the system's language, "Korrekte Signatur" on a German system, and that the fingerprints
   are what count
+- `docs/testnet.md` has a section 6, a test chain of your own: started by `mine --testnet` one block
+  at a time, or by `node --mine --no-default-peers` on an empty file, which mines its own genesis
+  block instead of taking the test network's from a seed node. Both ran word for word, and a second
+  node joined such a chain with `--peer` and `--no-default-peers`
 
 Version 0.5.0
 -------------
