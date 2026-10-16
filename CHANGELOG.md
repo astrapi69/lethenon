@@ -38,6 +38,13 @@ CHANGED:
 
 ADDED:
 
+- `docs/testnet.md`, "Join the testnet" (#198), linked from the README: requirements and Java 25,
+  downloading the distribution and checking its signature and checksum, the first start with an empty
+  chain file, which takes the chain from the seed nodes in the code (#197), optionally Tor and mining
+  with a test wallet, a systemd service as on seed node 1, and a section for the Raspberry Pi 4 and 5
+  with a 64-bit operating system and an SSD instead of the SD card for a node that runs all the time.
+  Run through once on a GitHub ARM64 runner in Debian 13 with the page's commands, every step green;
+  the page says what that covered and that it was not run on a Raspberry Pi itself
 - the test network's seed nodes are in the code (#197). A node started without `--peer` dials them:
   seed node 1's IP address, or with `--proxy` its onion address, so that a node behind Tor stays
   inside Tor. `TestNetworkSeeds` names them with the genesis hash of the chain they serve, and a node
