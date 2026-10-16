@@ -57,6 +57,11 @@ FIXED:
   minute). A configured peer that turns out to be the node itself now leaves the redials, as an
   address learnt from a peer already left discovery. Measured in `RedialTest`: one attempt, seen from
   both ends of its connection, over five rounds of the pauses; with the change undone, the count grows
+- `lethenon --version` prints the version of the build, `lethenon 0.6.0`, instead of `lethenon 0.1`
+  whatever the build was (#193). The build writes `projectVersion` into a resource beside the command
+  line, which picocli's version provider reads. Measured in `LethenonCliTest`, red before the change
+  with `expected: <lethenon 0.6.0-SNAPSHOT> but was: <lethenon 0.1>`, and on the installed
+  distribution: `lethenon 0.6.0-SNAPSHOT`, and `lethenon 0.6.0` with `-PprojectVersion=0.6.0`
 
 Version 0.5.0
 -------------

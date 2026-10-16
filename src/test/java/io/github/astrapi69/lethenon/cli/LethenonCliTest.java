@@ -39,6 +39,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -60,6 +61,19 @@ import io.github.astrapi69.lethenon.Replay;
  */
 class LethenonCliTest extends AbstractCliTest
 {
+
+	@Test
+	@DisplayName("--version prints the version of the build, not a fixed string (#193)")
+	void version_isTheBuildsVersion()
+	{
+		String expected = System.getProperty("lethenon.projectVersion");
+		assertTrue(expected != null && !expected.isBlank(),
+			"the build passes the project version to the tests");
+
+		assertEquals(0, run("", "--version"), err);
+
+		assertEquals("lethenon " + expected, out.strip());
+	}
 
 
 	private static final Pattern PHRASE = Pattern.compile("^((?:[a-z]+ ){23}[a-z]+)$",

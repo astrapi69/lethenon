@@ -74,6 +74,15 @@ application {
     applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']
 }
 
+// the version --version prints, from projectVersion (#193)
+tasks.named('processResources', ProcessResources) {
+    def projectVersion = version.toString()
+    inputs.property('projectVersion', projectVersion)
+    filesMatching('**/cli/version.properties') {
+        expand(version: projectVersion)
+    }
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
@@ -81,6 +90,8 @@ tasks.withType(JavaCompile).configureEach {
 test {
     useJUnitPlatform()
     jvmArgs '--enable-native-access=ALL-UNNAMED'
+    // what --version has to print, LethenonCliTest (#193)
+    systemProperty 'lethenon.projectVersion', version
     // the crash tests of #202 run 25 times each by default; the gate before a release runs them a
     // thousand times with -PcrashRuns=1000
     def crashRuns = findProperty('crashRuns')
