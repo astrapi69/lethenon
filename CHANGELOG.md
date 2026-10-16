@@ -103,6 +103,10 @@ KNOWN AND NOT FIXED:
 - `node --mine` computes on one thread (#201)
 - rarely, `OnionConnectTimeTest` fails after 10 s, and the run then hangs for most of an hour; not
   reproduced (#212)
+- a chain file of 0.5.0 whose blocks do not fit together is refused at the migration with an
+  `IOException` that names `<chain>.migrating` rather than the file, and leaves that `.migrating`
+  database behind; the file itself stays unchanged. Callers that caught `ChainRejected` for such a
+  chain see an `IOException` instead (#216)
 
 Version 0.5.0
 -------------
