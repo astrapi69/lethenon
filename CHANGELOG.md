@@ -19,7 +19,8 @@ FORMAT:
   written by 0.6.0 cannot be read by 0.5.0; the `.legacy` copy can, as it was when it was migrated.
 - **Measured** (`docs/measurements/0006-chain-database/`): `kill -9` at random moments of a block
   write and of a rollback, and a simulated power cut at the same moments, leave the change whole or
-  not at all in every run; the counter-runs without the transaction, and without the sync, fail. The
+  not at all in every run: 1,000 runs of each `kill -9` test and 5,000 disks of each power-cut test, 0
+  broken (`-PcrashRuns=1000`, Linux x86_64); the counter-runs without the transaction, and without the sync, fail. The
   same 300 blocks wrote 99,623,517 bytes with no sync in 0.5.0 and write 7,411,060 bytes with 1,207
   syncs now. A 301-block chain with 2,990 transfers migrated block for block identical.
 
