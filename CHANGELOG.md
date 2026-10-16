@@ -48,6 +48,14 @@ CHANGED:
   block instead of taking the test network's from a seed node. Both ran word for word, and a second
   node joined such a chain with `--peer` and `--no-default-peers`
 
+FIXED:
+
+- `lethenon --version` prints the version of the build, `lethenon 0.6.0`, instead of `lethenon 0.1`
+  whatever the build was (#193). The build writes `projectVersion` into a resource beside the command
+  line, which picocli's version provider reads. Measured in `LethenonCliTest`, red before the change
+  with `expected: <lethenon 0.6.0-SNAPSHOT> but was: <lethenon 0.1>`, and on the installed
+  distribution: `lethenon 0.6.0-SNAPSHOT`, and `lethenon 0.6.0` with `-PprojectVersion=0.6.0`
+
 Version 0.5.0
 -------------
 

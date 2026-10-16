@@ -41,7 +41,7 @@ import picocli.CommandLine.Command;
  * verify, a wrong password, a transfer the account cannot cover; 2 a command line that was not
  * understood.
  */
-@Command(name = "lethenon", mixinStandardHelpOptions = true, version = "lethenon 0.1",
+@Command(name = "lethenon", mixinStandardHelpOptions = true, versionProvider = BuildVersion.class,
 	description = "A protest chain against the politics of surveillance.",
 	subcommands = { WalletCommand.class, MineCommand.class, SendCommand.class,
 			FaucetCommand.class, BalanceCommand.class, SweepCommand.class,
