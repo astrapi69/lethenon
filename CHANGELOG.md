@@ -50,6 +50,13 @@ CHANGED:
 
 FIXED:
 
+- a seed node started without `--peer` no longer dials itself again and again (#205). Since 0.5.0 a
+  node given no peer dials the test network's seed nodes, and a seed node is one of them: its
+  handshake recognised itself and said so, but a configured peer was dialled again after its pause,
+  so the refusals counted "is this node itself" without end (measured on seed node 1: ten in the first
+  minute). A configured peer that turns out to be the node itself now leaves the redials, as an
+  address learnt from a peer already left discovery. Measured in `RedialTest`: one attempt, seen from
+  both ends of its connection, over five rounds of the pauses; with the change undone, the count grows
 - `lethenon --version` prints the version of the build, `lethenon 0.6.0`, instead of `lethenon 0.1`
   whatever the build was (#193). The build writes `projectVersion` into a resource beside the command
   line, which picocli's version provider reads. Measured in `LethenonCliTest`, red before the change

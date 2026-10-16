@@ -356,7 +356,9 @@ it is not a permission.
   ```
 
   Without `--for` a node "runs until interrupted" (ADR 0003, "The node command"). The port is the
-  operator's choice. Stopping it with SIGTERM, as a service
+  operator's choice. A seed node with no other seed node to name leaves `--peer` out and gives
+  `--no-default-peers` instead. Without it, a node given no peer dials the seed nodes in the code,
+  itself among them; before #205 it did so again and again, and since then it does so once. Stopping it with SIGTERM, as a service
   manager does, prints its stop line and its refusals, the same as `--for` (#129).
 - **Updates**: the operating system's security updates automatically (on Debian and Ubuntu the
   `unattended-upgrades` package); lethenon itself by hand, from a signed release whose signature is
