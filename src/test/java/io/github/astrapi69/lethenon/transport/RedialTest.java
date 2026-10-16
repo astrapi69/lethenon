@@ -121,6 +121,32 @@ class RedialTest
 	}
 
 	@Test
+	@DisplayName("a configured peer that turns out to be this node is dialled once, and never again (#205)")
+	void aConfiguredPeerThatIsThisNode_isNotDialledAgain() throws IOException, InterruptedException
+	{
+		try (Node node = Node.on(genesis).redialingAfter(FIRST, LONGEST))
+		{
+			PeerAddress itself = new PeerAddress("127.0.0.1", node.listen(0));
+			node.connectAll(List.of(itself));
+			await("the first attempt, recognised as this node",
+				() -> countItself(node) == 2);
+
+			// long enough for five rounds of the pauses, which grow from 100 to 800 ms
+			Thread.sleep(LONGEST.multipliedBy(3).toMillis());
+
+			assertEquals(2, countItself(node),
+				"one attempt, seen from both ends of its connection: " + node.refusals());
+			assertTrue(node.peers().isEmpty());
+		}
+	}
+
+	private static long countItself(final Node node)
+	{
+		return node.refusals().stream().filter(reason -> reason.endsWith(" is this node itself"))
+			.count();
+	}
+
+	@Test
 	@DisplayName("without a configured peer nothing is dialled")
 	void withoutConfiguredPeers_nothingIsDialled() throws IOException
 	{

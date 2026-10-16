@@ -48,6 +48,16 @@ CHANGED:
   block instead of taking the test network's from a seed node. Both ran word for word, and a second
   node joined such a chain with `--peer` and `--no-default-peers`
 
+FIXED:
+
+- a seed node started without `--peer` no longer dials itself again and again (#205). Since 0.5.0 a
+  node given no peer dials the test network's seed nodes, and a seed node is one of them: its
+  handshake recognised itself and said so, but a configured peer was dialled again after its pause,
+  so the refusals counted "is this node itself" without end (measured on seed node 1: ten in the first
+  minute). A configured peer that turns out to be the node itself now leaves the redials, as an
+  address learnt from a peer already left discovery. Measured in `RedialTest`: one attempt, seen from
+  both ends of its connection, over five rounds of the pauses; with the change undone, the count grows
+
 Version 0.5.0
 -------------
 

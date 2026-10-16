@@ -695,6 +695,7 @@ public final class Node implements AutoCloseable
 		{
 			refusals.add(socket.getRemoteSocketAddress() + " is this node itself");
 			dialed.ifPresent(inTheZone ? zone.discovery()::isItself : discovery::isItself);
+			dialed.ifPresent(redials::isItself);
 			return null;
 		}
 		if (!inTheZone && !theirs.onionHost().isEmpty())
