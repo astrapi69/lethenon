@@ -57,12 +57,14 @@ Primary key fingerprint: 5B2F A6B1 1E29 8BC0 9287  F423 D8C4 0351 8C49 CA75
 ```
 
 The warning that the key "is not certified with a trusted signature" only means that you have not
-marked the key as trusted in your own keyring; the fingerprints are what to compare. If a check
+marked the key as trusted in your own keyring; the fingerprints are what to compare. gpg speaks the
+language of your system, so the words may differ: on a German system it says `Korrekte Signatur`,
+`Haupt-Fingerabdruck` and `Unter-Fingerabdruck`. The fingerprints are the same in every language. If a check
 fails, do not run the file.
 
-Before 0.5.0 is released, build it yourself instead: `git clone https://github.com/astrapi69/lethenon`,
-then `./gradlew installDist` with Java 25. The result in `build/install/lethenon` is what the archive
-holds.
+To build it yourself instead: `git clone https://github.com/astrapi69/lethenon`, `git checkout
+RELEASE-$VERSION`, then `./gradlew installDist` with Java 25. The result in `build/install/lethenon` is
+what the archive holds.
 
 Unpack:
 
@@ -232,7 +234,10 @@ Once, on 2026-10-15, on a real ARM64 machine, with the commands of this page
 - **1. Download and check:** no release carried the archives yet, so the rehearsal of the
   distribution workflow stood in for the download (#196): `lethenon-0.5.0-SNAPSHOT.tar.gz` from
   develop. `sha256sum -c` printed `OK`. `gpg` printed `Good signature`, with the primary key and
-  subkey fingerprints above.
+  subkey fingerprints above. On 2026-10-16, after the release, section 1 ran word for word against
+  the published `RELEASE-0.5.0`: logged out of GitHub, in an empty directory and an empty keyring,
+  on x86-64. `sha256sum -c` printed `lethenon-0.5.0.tar.gz: OK`, gpg (in German) gave a good
+  signature with both fingerprints above, and `bin/lethenon --help` answered.
 - **2. First start:** with an empty chain file and no `--peer`, the node took the genesis block from
   seed node 1 (`took the genesis block from the peer at 185.112.144.29:18480`), had height 364 at
   its first status line, and followed the seed to 365. It stopped with one refusal, its own public

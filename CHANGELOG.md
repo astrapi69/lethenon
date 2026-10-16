@@ -1,6 +1,17 @@
 ## Change log
 ----------------------
 
+Version 0.6.0 (unreleased)
+-------------
+
+CHANGED:
+
+- `docs/testnet.md` points at the published 0.5.0: its download and check, section 1, ran word for
+  word against the GitHub release `RELEASE-0.5.0`, logged out, in an empty directory and keyring, and
+  the page says so. To build it yourself, it names the release tag to check out. It also says that gpg
+  answers in the system's language, "Korrekte Signatur" on a German system, and that the fingerprints
+  are what count
+
 Version 0.5.0
 -------------
 
