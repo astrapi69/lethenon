@@ -4,6 +4,32 @@
 Version 0.6.0 (unreleased)
 -------------
 
+FORMAT:
+
+- **The chain file is an SQLite database** (#202, [ADR 0006](docs/adr/0006-chain-database.md)). A new
+  block, a rollback over a fork of any depth, and the transfers waiting beside them are written in one
+  transaction, synced to the disk (`journal_mode=WAL`, `synchronous=FULL`, `fullfsync=ON`). Nothing
+  about the chain's bytes changes: every block is stored in its canonical encoding, under its hash.
+- **Every read verifies.** SQLite's integrity check, heights from zero without a gap, every stored hash
+  against its block, every block against the one below; a node then replays the chain as before. A
+  database that fails is refused with what failed and where, and left as it is.
+- **A chain file of 0.5.0 or earlier is migrated on first use**: copied into a new database in one
+  transaction, compared block by block and transfer by transfer, and only then put in place. The old
+  file stays beside it as `<chain>.legacy`, and `<chain>.pending` as `<chain>.pending.legacy`. A chain
+  written by 0.6.0 cannot be read by 0.5.0; the `.legacy` copy can, as it was when it was migrated.
+- **Measured** (`docs/measurements/0006-chain-database/`): `kill -9` at random moments of a block
+  write and of a rollback, and a simulated power cut at the same moments, leave the change whole or
+  not at all in every run; the counter-runs without the transaction, and without the sync, fail. The
+  same 300 blocks wrote 99,623,517 bytes with no sync in 0.5.0 and write 7,411,060 bytes with 1,207
+  syncs now. A 301-block chain with 2,990 transfers migrated block for block identical.
+
+ADDED:
+
+- `sqlite-jdbc` 3.53.4.0 (Apache-2.0, with SQLite in the public domain) as a runtime dependency, the
+  first that is not of this family; `NOTICE` carries its notices and ships in the distribution with
+  `LICENSE`. The start scripts pass `--enable-native-access=ALL-UNNAMED`, which JDK 25 asks for before
+  a library loads native code.
+
 CHANGED:
 
 - `docs/testnet.md` points at the published 0.5.0: its download and check, section 1, ran word for

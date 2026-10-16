@@ -81,8 +81,11 @@ block 1 pays the first wallet that mines on it, which is where the faucet pays f
 before 0.4.0, is refused with a message that names its successor (#137). A new
 cryptographic scheme runs on the test chain first ([ADR 0001](docs/adr/0001-new-cryptographic-constructions.md)).
 
-`send`, `faucet` and `sweep` sign transfers that wait in `chain.lethenon.pending`; the next `mine` puts
-every waiting transfer into a block, replays the result and only then writes it. Exit codes: 0
+`send`, `faucet` and `sweep` sign transfers that wait beside the chain, in the same file; the next
+`mine` puts every waiting transfer into a block, replays the result and only then writes it. Since
+0.6.0 the chain file is an SQLite database, written one transaction per change and verified on
+every read, and a chain file of an earlier version is migrated on first use and kept as
+`<chain>.legacy` ([ADR 0006](docs/adr/0006-chain-database.md)). Exit codes: 0
 done, 1 refused with the reason on standard error, 2 a command line that was not understood.
 
 ### A test network
@@ -114,7 +117,7 @@ lethenon node --chain d.lethenon --listen 18431 --tx-proxy tor,127.0.0.1:9050 \
     --anonymous-inbound <56 characters>.onion:18484,127.0.0.1:18484   # own transfers only over Tor, reachable as an onion service
 ```
 
-A node keeps its chain file and `<chain>.pending` up to date and owns them while it runs.
+A node keeps its chain file, and the transfers waiting in it, up to date while it runs.
 `send --node` hands the transfer to the node that serves the file named by `--chain`. A node
 with an empty file takes the genesis block from the first peer that answers; everything after
 it is verified block by block. The longer chain by cumulative work wins, and a fork is followed

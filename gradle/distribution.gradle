@@ -12,6 +12,16 @@
  */
 def releaseVersion = !version.endsWith("SNAPSHOT")
 
+// the licence and the third-party notices travel with the program (ADR 0001 rule 6, ADR 0006)
+distributions {
+    main {
+        contents {
+            from(rootProject.file('LICENSE'))
+            from(rootProject.file('NOTICE'))
+        }
+    }
+}
+
 tasks.named('distTar', Tar) {
     compression = Compression.GZIP
     archiveExtension = 'tar.gz'

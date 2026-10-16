@@ -125,7 +125,7 @@ its zone peers only, which here means B, and to no clearnet peer (#116). When B 
 stopped at height H, mined 0 block(s), 1 transfer(s) waiting, 0 peer(s) connected, 1 anonymity peer(s)
 ```
 
-The transfer waits in B's pool (`b.lethenon.pending`). B never had a clearnet peer, so it can only
+The transfer waits in B's pool, which B keeps in `b.lethenon` beside its chain. B never had a clearnet peer, so it can only
 have come through the zone.
 
 A mines it into its next block. That is the limit ADR 0004 names: a node that mines can reveal its
