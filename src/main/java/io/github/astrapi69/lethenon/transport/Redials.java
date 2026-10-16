@@ -168,6 +168,16 @@ final class Redials
 		}
 	}
 
+	/**
+	 * A configured peer turned out to be this node itself: it is never dialled again, as discovery
+	 * never dials such an address again (#205). A seed node given no peer dials the seed nodes in the
+	 * code, itself among them.
+	 */
+	synchronized void isItself(final PeerAddress address)
+	{
+		configured.remove(address);
+	}
+
 	/** Whether the address is one the node was given, rather than one it learnt */
 	synchronized boolean isConfigured(final PeerAddress address)
 	{
