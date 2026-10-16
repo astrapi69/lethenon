@@ -61,7 +61,36 @@ database: 1236992 bytes
 ```
 
 `migrate-seed-chain.sh` does the same with a chain synced from seed node 1 by a build of 0.5.0. It
-could not run where this was written: the seed node's port is not reachable from there.
+could not run where this was written, because the seed node's port is not reachable from there.
+
+It ran on 2026-10-16 at 13:59 (local time, UTC+2) on Linux x86_64. The chain was synced by the signed
+0.5.0 from the GitHub release; the migration and the comparison were made with develop `c0c65c2`:
+
+```sh
+docs/measurements/0006-chain-database/migrate-seed-chain.sh \
+    <lethenon-0.5.0>/bin/lethenon build/install/lethenon/lib <work dir>
+```
+
+```
+chain lethenon-test-2 from the node at 185.112.144.29:18480: took 625 block(s), now at height 624
+625 blocks, 132914 bytes, compared block by block: identical; migration and verified read took 0,20 s
+tip 00000008ff34bd9cd6038acf4e00c73077826642263e75613fe51916ce75ea2d at height 624
+replayed 625 blocks, applied 0 transfers, checked 0 signatures; ...
+old file kept: true
+database: 184320 bytes
+```
+
+Three checks beside it:
+- The `.legacy` copy is byte for byte the synced 0.5.0 file (`cmp`), and 0.5.0 still reads it: its
+  genesis hash is the network's, `0093b8db...1d6e`.
+- The database starts with `SQLite format 3`.
+- 0.5.0 refuses the database and leaves it unchanged (sha256 before and after `91d7f555...`), with
+  `this build reads block encoding version 2 and the bytes carry version 83`. 83 is the `S` of the
+  SQLite header. That is all a user of 0.5.0 learns about a migrated chain, so the release notes of
+  0.6.0 have to say it.
+
+The seed node's chain carries no transfers. The transfers are covered by the 301-block chain above,
+with 2,990 transfers.
 
 ## The crash tests
 
@@ -81,4 +110,25 @@ On db0b4bf, 2026-10-16 08:55 to 09:19 UTC, Linux x86_64: 4 tests, 0 failures, 23
 | power cut while blocks are written | 5000 disks from 1000 runs | 4900 | 0 |
 | power cut while a fork is rolled back | 5000 disks from 1000 runs | 4915 | 0 |
 
-Not yet run: the same on ARM64.
+On ARM64, 2026-10-16 12:25 to 12:47 UTC, on c0c65c2 (develop after #210), a GitHub-hosted
+`ubuntu-24.04-arm` runner: aarch64, 4 cores (`CPU part 0xd49`), 15.9 GB, Ubuntu 24.04.5, Temurin
+25.0.4.1. It ran from a throwaway branch with a workflow that ran once and was deleted. 4 tests, 0
+failures, 21 min 58 s:
+
+| test | runs | killed inside a write | broken |
+|---|---|---|---|
+| kill -9 while blocks are written | 1000 | 977 | 0 |
+| kill -9 while a fork is rolled back | 1000 | 992 | 0 |
+| power cut while blocks are written | 5000 disks from 1000 runs | 4910 | 0 |
+| power cut while a fork is rolled back | 5000 disks from 1000 runs | 4955 | 0 |
+
+The counts come from the tests' own output in the XML of that step. `PowerCutTest` was not
+skipped: the runner's C compiler built `src/test/native/iolog.c` for aarch64, and the writer ran with
+it preloaded (0 skipped, 5000 disks per test). sqlite-jdbc took its own `Linux/aarch64/libsqlitejdbc.so`.
+The whole suite ran on the same machine afterwards: 84 classes, 829 tests, 0 failures. A first run of
+the same workflow passed as well (22 min 26 s); its counts were lost, because the whole suite
+overwrote that step's XML.
+
+What this does not cover: a Raspberry Pi itself, an SD card, and a real power cut. `PowerCutTest`
+builds the disks a cut could leave from the recorded writes and syncs, after the model of SQLite's
+own crash tests; no disk lost its power.
