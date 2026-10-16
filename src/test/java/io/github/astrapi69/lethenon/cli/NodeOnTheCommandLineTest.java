@@ -149,7 +149,7 @@ class NodeOnTheCommandLineTest extends AbstractCliTest
 				"--to", account, "--amount", "2", "--node", address);
 
 			assertEquals(1, exit, out);
-			assertTrue(err.contains("not in " + chain + ".pending"), err);
+			assertTrue(err.contains("not waiting in " + chain), err);
 			assertEquals(1, node.pending().size(), "the second one reused nonce 0");
 		}
 	}

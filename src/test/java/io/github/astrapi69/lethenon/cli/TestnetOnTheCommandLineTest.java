@@ -41,7 +41,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import io.github.astrapi69.lethenon.BlockBody;
 import io.github.astrapi69.lethenon.Blocks;
-import io.github.astrapi69.lethenon.CanonicalEncoding;
 import io.github.astrapi69.lethenon.Chain;
 import io.github.astrapi69.lethenon.Amount;
 import io.github.astrapi69.lethenon.Bytes;
@@ -99,7 +98,7 @@ class TestnetOnTheCommandLineTest extends AbstractCliTest
 		assertEquals(0, run(password, "mine", "--chain", chain.toString(), "--wallet", wallet),
 			err);
 
-		List<BlockBody> blocks = CanonicalEncoding.readChain(Files.readAllBytes(chain));
+		List<BlockBody> blocks = new ChainFile(chain).read();
 		assertEquals(List.of(Chain.TEST_IDENTIFIER, Chain.TEST_IDENTIFIER, Chain.TEST_IDENTIFIER),
 			blocks.stream().map(BlockBody::chainIdentifier).toList());
 		assertEquals(Chain.TEST_IDENTIFIER,
@@ -125,8 +124,8 @@ class TestnetOnTheCommandLineTest extends AbstractCliTest
 	void aMainChainWithoutTheAnchor_isRefused() throws Exception
 	{
 		// mined through the library rather than by this build's mine, which starts no main chain
-		Files.write(chain, CanonicalEncoding.encodeChain(List.of(Genesis.candidate(Chain.IDENTIFIER,
-			"mined elsewhere", System.currentTimeMillis()))));
+		new ChainFile(chain).write(List.of(Genesis.candidate(Chain.IDENTIFIER, "mined elsewhere",
+			System.currentTimeMillis())));
 		byte[] before = Files.readAllBytes(chain);
 
 		assertEquals(1, run(password, "balance", "--chain", chain.toString(), "--wallet", wallet),
@@ -145,9 +144,8 @@ class TestnetOnTheCommandLineTest extends AbstractCliTest
 		// a main chain file mined elsewhere: this build has no anchor for the main chain, so the
 		// file is refused for that before --testnet is looked at (#161); with the anchor of 1.0.0 the
 		// refusal names the test chain as well
-		Files.write(chain, CanonicalEncoding.encodeChain(List.of(Blocks.mine(Mining.nextBlock(
-			Chain.IDENTIFIER, List.of(), Genesis.NOBODY, List.of(), "main", System.currentTimeMillis()),
-			1_000_000L).orElseThrow())));
+		new ChainFile(chain).write(List.of(Blocks.mine(Mining.nextBlock(Chain.IDENTIFIER, List.of(),
+			Genesis.NOBODY, List.of(), "main", System.currentTimeMillis()), 1_000_000L).orElseThrow()));
 		byte[] before = Files.readAllBytes(chain);
 
 		int exit = run(password, "mine", "--testnet", "--chain", chain.toString(), "--wallet",

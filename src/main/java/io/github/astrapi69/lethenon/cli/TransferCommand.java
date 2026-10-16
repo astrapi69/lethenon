@@ -141,7 +141,7 @@ abstract class TransferCommand extends ChainCommand
 		if (!after.contains(signed))
 		{
 			throw new IllegalStateException("the node at " + node + " took the transfer, and it "
-				+ "is not in " + chain + ".pending: a node that serves another chain file keeps "
+				+ "is not waiting in " + chain + ": a node that serves another chain file keeps "
 				+ "its pool there, and a node that refused it says why in its output");
 		}
 		return after.size();

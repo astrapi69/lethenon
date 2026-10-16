@@ -57,6 +57,10 @@ dependencies {
     // the command line (lethenon#2, milestone 4) - the version mystic-crypt's own CLI uses, so the
     // family runs one picocli. Declared directly because it is used directly
     implementation "info.picocli:picocli:$picocliVersion"
+    // the chain on disk (#202, ADR 0006): SQLite, for transactions that survive a killed process and
+    // a power cut. Not a family library: storage is not what the family offers, and the ADR records
+    // why this engine and this binding
+    implementation "org.xerial:sqlite-jdbc:$sqliteJdbcVersion"
 
     testImplementation platform("org.junit:junit-bom:$junitVersion")
     testImplementation "org.junit.jupiter:junit-jupiter"
@@ -65,6 +69,9 @@ dependencies {
 
 application {
     mainClass = 'io.github.astrapi69.lethenon.cli.LethenonCli'
+    // sqlite-jdbc loads its native library with System::load, which JDK 25 allows with a warning
+    // on every start unless the program says it means to (ADR 0006)
+    applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -73,6 +80,13 @@ tasks.withType(JavaCompile).configureEach {
 
 test {
     useJUnitPlatform()
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+    // the crash tests of #202 run 25 times each by default; the gate before a release runs them a
+    // thousand times with -PcrashRuns=1000
+    def crashRuns = findProperty('crashRuns')
+    if (crashRuns != null) {
+        systemProperty 'lethenon.crashRuns', crashRuns
+    }
 }
 
 /**

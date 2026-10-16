@@ -359,8 +359,7 @@ final class Gossip
 		{
 			try
 			{
-				file.write(local.blocks());
-				file.writePending(local.pool().waiting());
+				file.write(local.blocks(), local.pool().waiting());
 			}
 			catch (IOException unwritable)
 			{

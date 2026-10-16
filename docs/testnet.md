@@ -25,8 +25,10 @@ transfers on to its peers. It asks nobody for a balance and tells nobody one.
 - **gpg** and **sha256sum**, to check the download (`sudo apt install gnupg`; `sha256sum` is part of
   coreutils).
 - **A little memory and disk.** A node that does not mine runs with `-Xmx64m`: seed node 1 does, and
-  measured between 62 and 99 MB. A mining node has run with `-Xmx128m`. The chain file was 77 776
-  bytes at height 365, about 213 bytes per block without transfers.
+  measured between 62 and 99 MB. A mining node has run with `-Xmx128m`. With 0.5.0 the chain file
+  was 77 776 bytes at height 365, about 213 bytes per block without transfers. Since 0.6.0 it is a
+  database, about 1.7 times that: 366 blocks without transfers measured 53 743 bytes as a 0.5.0 chain
+  file and 90 112 bytes as a database (`docs/measurements/0006-chain-database/ChainSize.java`).
 - **Outgoing TCP to port 18480**, or Tor (section 3). Incoming connections are optional.
 
 ## 1. Download and check
@@ -238,11 +240,12 @@ A Raspberry Pi 4 or 5 runs a node, and mines on it, with a **64-bit** operating 
   from the system, as in [What you need](#what-you-need). On 12 (bookworm) it does not; take a Java 25
   runtime for `aarch64` from elsewhere, for example Eclipse Temurin, or move to a Raspberry Pi OS
   built on Debian 13.
-- **An SSD instead of the SD card, for a node that runs all the time.** The node writes its chain file
-  anew for every block, the whole file and not only the new block
-  ([#202](https://github.com/astrapi69/lethenon/issues/202)). That is tens of kilobytes today and grows
-  with the chain, about every two minutes, day and night. SD cards are not made for that kind of
-  constant writing and wear out under it. Put at least `~/lethenon` (or `/var/lib/lethenon`) on an SSD:
+- **An SSD instead of the SD card, for a node that runs all the time.** Since 0.6.0 the node writes
+  each block as one database transaction and syncs it to the disk, so that neither a crash nor a power
+  cut can damage the chain ([ADR 0006](adr/0006-chain-database.md)). That is about 25 KB and four
+  syncs per block of ten transfers, the same at every height (`docs/measurements/0006-chain-database/`),
+  about every two minutes, day and night. SD cards are not made for that kind of constant writing and
+  syncing and wear out under it. Put at least `~/lethenon` (or `/var/lib/lethenon`) on an SSD:
   a USB 3 SSD on a Pi 4 or 5, or an NVMe SSD through an M.2 HAT on a Pi 5. Booting from the SSD is
   better still. For trying it out for an afternoon, the SD card is fine.
 - **Memory:** `-Xmx64m` is enough for a node that does not mine, so 1 GB of RAM is plenty. A mining
