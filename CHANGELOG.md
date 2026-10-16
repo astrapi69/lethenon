@@ -17,6 +17,11 @@ FORMAT:
   transaction, compared block by block and transfer by transfer, and only then put in place. The old
   file stays beside it as `<chain>.legacy`, and `<chain>.pending` as `<chain>.pending.legacy`. A chain
   written by 0.6.0 cannot be read by 0.5.0; the `.legacy` copy can, as it was when it was migrated.
+  0.5.0 says only "this build reads block encoding version 2 and the bytes carry version 83" (83 is
+  the `S` of the SQLite header) and leaves the database unchanged. Measured on a chain synced from seed
+  node 1: 625 blocks migrated and compared block by block, identical. The crash gate, a thousand runs
+  per test, passed on Linux x86_64 and on ARM64 (aarch64), 0 broken in either
+  (`docs/measurements/0006-chain-database/README.md`)
 - **Measured** (`docs/measurements/0006-chain-database/`): `kill -9` at random moments of a block
   write and of a rollback, and a simulated power cut at the same moments, leave the change whole or
   not at all in every run: 1,000 runs of each `kill -9` test and 5,000 disks of each power-cut test, 0
