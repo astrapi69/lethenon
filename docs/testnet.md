@@ -244,9 +244,6 @@ it takes the genesis block from that peer.
 
 A Raspberry Pi 4 or 5 runs a node, and mines on it, with a **64-bit** operating system:
 
-> **Being checked:** how the chain of 0.6.0 survives a crash or a power cut on ARM64 is being measured
-> again against the published 0.6.0 (#202). This note goes when the result is in.
-
 - **Operating system:** 64-bit Raspberry Pi OS, or any other 64-bit Debian. `uname -m` must print
   `aarch64`. On a 32-bit system (`armv7l`) this page does not apply.
 - **Java:** `cat /etc/debian_version` shows which Debian the system is built on. On 13, Java 25 comes
@@ -263,6 +260,9 @@ A Raspberry Pi 4 or 5 runs a node, and mines on it, with a **64-bit** operating 
   better still. For trying it out for an afternoon, the SD card is fine.
 - **Memory:** `-Xmx64m` is enough for a node that does not mine, so 1 GB of RAM is plenty. A mining
   node has run with `-Xmx128m`.
+- **Crash safety:** the chain of 0.6.0 was killed mid-write and cut off mid-write in a simulation on ARM64, a
+  thousand times per test, against the published 0.6.0, with nothing broken
+  (`docs/measurements/0006-chain-database/README.md`). Not on a Pi itself, not on an SD card.
 - **Mining** keeps one of the four cores at full load for as long as it runs. Give the Pi a heat sink
   or the official case fan. Without one, the Pi throttles its clock and mines more slowly.
 - Everything else is as above: download and check, first start, Tor, mining, the systemd service.
