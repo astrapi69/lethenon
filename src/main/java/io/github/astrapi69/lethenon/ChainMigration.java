@@ -25,13 +25,11 @@
 package io.github.astrapi69.lethenon;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -157,22 +155,7 @@ final class ChainMigration
 		{
 			return List.of();
 		}
-		ByteBuffer buffer = ByteBuffer.wrap(Files.readAllBytes(file));
-		byte version = buffer.get();
-		if (version != ChainFile.PENDING_VERSION)
-		{
-			throw new IllegalArgumentException(file + " is pending-file version " + version
-				+ " and this build reads version " + ChainFile.PENDING_VERSION);
-		}
-		int count = buffer.getInt();
-		List<SignedTransaction> transfers = new ArrayList<>(count);
-		for (int index = 0; index < count; index++)
-		{
-			byte[] encoded = new byte[buffer.getInt()];
-			buffer.get(encoded);
-			transfers.add(CanonicalEncoding.readSignedTransaction(encoded));
-		}
-		return transfers;
+		return LegacyPendingFile.read(file);
 	}
 
 	private static void move(final Path from, final Path to) throws IOException

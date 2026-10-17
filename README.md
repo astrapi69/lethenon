@@ -56,6 +56,7 @@ lethenon send    --chain chain.lethenon --wallet w.wallet --to <account> --amoun
 lethenon send    --chain chain.lethenon --wallet w.wallet --to-address <view:spend> --amount 12.5
 lethenon sweep   --chain chain.lethenon --wallet w.wallet       # one-time payments onto the account
 lethenon balance --chain chain.lethenon --wallet w.wallet       # replays the chain, asks nobody
+lethenon export  --chain chain.lethenon --to old.lethenon       # the chain as 0.5.0 reads it, waiting transfers too
 ```
 
 `--to` names an account and the chain shows who was paid; `--to-address` names the published
@@ -85,7 +86,9 @@ cryptographic scheme runs on the test chain first ([ADR 0001](docs/adr/0001-new-
 `mine` puts every waiting transfer into a block, replays the result and only then writes it. Since
 0.6.0 the chain file is an SQLite database, written one transaction per change and verified on
 every read, and a chain file of an earlier version is migrated on first use and kept as
-`<chain>.legacy` ([ADR 0006](docs/adr/0006-chain-database.md)). Exit codes: 0
+`<chain>.legacy` ([ADR 0006](docs/adr/0006-chain-database.md)). That copy is the chain as it was
+then; `export` writes the chain as it is now as a chain file of 0.5.0, with its waiting transfers in
+`<file>.pending`, byte for byte what 0.5.0 writes, and overwrites nothing (#224). Exit codes: 0
 done, 1 refused with the reason on standard error, 2 a command line that was not understood.
 
 ### A test network
