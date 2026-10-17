@@ -4,6 +4,25 @@
 Version 0.7.0 (unreleased)
 -------------
 
+ADDED:
+
+- a way back to 0.5.0 (#224): `lethenon export --chain <database> --to <file>` writes the chain as it is
+  now as a chain file of 0.5.0, and its waiting transfers as `<file>.pending`. The `.legacy` copy the
+  migration leaves is the chain only as it was then. The export needs no wallet and overwrites nothing.
+  It refuses a chain file of 0.5.0 given by mistake and leaves it as it is, where reading it would have
+  migrated it. It reads back what it wrote and compares it block by block and transfer by transfer,
+  as the migration does, and removes what it wrote when that differs. Tested as the round trip that
+  was the condition for mystic-crypt-ui 8.10, against two chain files the published 0.5.0 wrote:
+  the test network's chain as 0.5.0 left it (733 blocks), and a chain with ML-DSA-65, a published
+  address and three transfers waiting. Each is migrated, exported, and migrated again:
+  - the file exported is the one 0.5.0 wrote, byte for byte, pending file included;
+  - the second database holds the first one's blocks and waiting transfers;
+  - every account the chain names has the same balance and next nonce, and the supply is the same,
+    in all four stages.
+
+  The reading of the pending file of 0.5.0 moved into one class that the migration and the export
+  share.
+
 CHANGED:
 
 - `docs/testnet.md` points at the published 0.6.0: its section 1 ran word for word against the GitHub
