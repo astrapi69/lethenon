@@ -23,6 +23,15 @@ ADDED:
   The reading of the pending file of 0.5.0 moved into one class that the migration and the export
   share.
 
+FIXED:
+
+- a chain file of 0.5.0 whose blocks do not fit together is refused before the migration (#216): as
+  `ChainRejected`, naming the person's file and the block, "block 3 names ... as the previous hash, and
+  the block before it hashes to ...", and saying that the file is left as it was and was not migrated.
+  0.6.0 copied it first, refused the copy as an `IOException` naming `<chain>.migrating`, and left that
+  copy behind. Whether the chain follows the consensus rules is still the replay's question, after the
+  migration, as on every read
+
 CHANGED:
 
 - `docs/testnet.md` points at the published 0.6.0: its section 1 ran word for word against the GitHub
