@@ -25,6 +25,12 @@ ADDED:
 
 FIXED:
 
+- the command line distribution no longer ships jackson 2.16.0-rc1 and commons-beanutils 1.9.4, which
+  Dependabot flags (#231). Neither is used here: mystic-crypt brings them through randomizer and
+  jobj-copy, and through file-worker and jobj-compare. A dependency constraint raises them to
+  jackson 2.22.4 and commons-beanutils 1.11.0 until those libraries move, and `RuntimeDependenciesTest`
+  holds the floor
+
 - a chain file of 0.5.0 whose blocks do not fit together is refused before the migration (#216): as
   `ChainRejected`, naming the person's file and the block, "block 3 names ... as the previous hash, and
   the block before it hashes to ...", and saying that the file is left as it was and was not migrated.
