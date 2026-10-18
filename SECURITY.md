@@ -160,5 +160,8 @@ So that a report can start from what is known rather than from zero:
   ([docs/launch/release-key.md](docs/launch/release-key.md)).
 - Test key material is generated at test runtime and never committed, so nothing in this
   repository is a real key.
-
-Not in place yet: CodeQL and Dependabot security updates are not enabled on this repository.
+- **CodeQL** runs on every push and pull request to `develop`, plus weekly.
+- **Dependabot security updates** are enabled. A dependency that arrives only transitively, through
+  a library of the family, is one Dependabot cannot fix; its floor is held in `build.gradle` until the
+  library that declares it moves, and `RuntimeDependenciesTest` fails when the archive would ship a
+  version below it (#231).
