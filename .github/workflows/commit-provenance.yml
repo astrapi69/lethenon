@@ -11,6 +11,11 @@ on:
   pull_request:
     branches: [ master, develop, "consensus/**" ]
 
+# The job reads the pull request's commits and writes nothing; without this it would run with the
+# repository's default token, which can write (#234, code scanning alert #1)
+permissions:
+  contents: read
+
 jobs:
   no-non-human-co-authors:
 
