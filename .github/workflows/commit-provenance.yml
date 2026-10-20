@@ -11,6 +11,9 @@ on:
   pull_request:
     branches: [ master, develop, "consensus/**" ]
 
+permissions:
+  contents: read
+
 jobs:
   no-non-human-co-authors:
 
