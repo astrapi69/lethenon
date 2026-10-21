@@ -62,17 +62,6 @@ dependencies {
     // why this engine and this binding
     implementation "org.xerial:sqlite-jdbc:$sqliteJdbcVersion"
 
-    // Not used here, and not declared by anything this project names: mystic-crypt brings jackson
-    // through randomizer and jobj-copy (2.16.0-rc1) and commons-beanutils through file-worker and
-    // jobj-compare (1.9.4), and the command line distribution ships both. Dependabot flags those
-    // versions and cannot fix what nobody declares, so the floor is held here until the libraries
-    // that declare them move (#231). RuntimeDependenciesTest holds it
-    constraints {
-        implementation "com.fasterxml.jackson.core:jackson-core:$jacksonVersion"
-        implementation "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
-        implementation "commons-beanutils:commons-beanutils:$commonsBeanutilsVersion"
-    }
-
     testImplementation platform("org.junit:junit-bom:$junitVersion")
     testImplementation "org.junit.jupiter:junit-jupiter"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
