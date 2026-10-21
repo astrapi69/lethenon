@@ -25,6 +25,16 @@ ADDED:
 
 FIXED:
 
+- the crash tests no longer call a whole chain broken (#240). They killed the writer with
+  `Process.destroyForcibly()`, which in JDK 25 also closes its output, so the writer's last lines
+  could be lost under load and the test compared the database with a step the writer had already
+  left behind; the databases of every such run were whole. The kill now goes through the process
+  handle, and a run whose output was cut short fails the test instead of being judged. The writers
+  unpack sqlite-jdbc's native library into the test's temporary directory instead of leaving a copy
+  in `java.io.tmpdir` for every kill. Measured after the change with `-PcrashRuns=3000`: 3,000 kills
+  while growing and 3,000 while rolling back, 15,000 disks of each power cut test, 0 runs with the
+  output cut short, 0 broken, and no copy of the library left in `java.io.tmpdir`
+
 - the command line distribution no longer ships jackson 2.16.0-rc1 and commons-beanutils 1.9.4, which
   Dependabot flags (#231). Neither is used here: mystic-crypt brings them through randomizer and
   jobj-copy, and through file-worker and jobj-compare. Those libraries moved, and lethenon depends on
