@@ -27,9 +27,10 @@ FIXED:
 
 - the command line distribution no longer ships jackson 2.16.0-rc1 and commons-beanutils 1.9.4, which
   Dependabot flags (#231). Neither is used here: mystic-crypt brings them through randomizer and
-  jobj-copy, and through file-worker and jobj-compare. A dependency constraint raises them to
-  jackson 2.22.4 and commons-beanutils 1.11.0 until those libraries move, and `RuntimeDependenciesTest`
-  holds the floor
+  jobj-copy, and through file-worker and jobj-compare. Those libraries moved, and lethenon depends on
+  mystic-crypt 13.7 now, which brings jackson 2.22.4 and commons-beanutils 1.11.0 (randomizer 10.6 and
+  jobj-copy 4.3, file-worker 19.1 and jobj-compare 12); the dependency constraint that raised them in
+  the meantime is gone, and `RuntimeDependenciesTest` holds the floor
 
 - a chain file of 0.5.0 whose blocks do not fit together is refused before the migration (#216): as
   `ChainRejected`, naming the person's file and the block, "block 3 names ... as the previous hash, and

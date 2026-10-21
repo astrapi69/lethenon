@@ -40,10 +40,12 @@ import org.junit.jupiter.params.provider.CsvSource;
  * What the release archive carries must not be what Dependabot flags (#231).
  * <p>
  * jackson and commons-beanutils are not this project's dependencies: they arrive through
- * mystic-crypt, from {@code jobj-copy} and {@code jobj-compare}, at 2.16.0-rc1 and 1.9.4, and the
- * command line distribution ships whatever the runtime class path holds. Dependabot cannot open a
- * fix for a dependency nobody declares, so the floor is held here, against the class path the tests
- * run on, which holds the same resolved versions as the runtime one.
+ * mystic-crypt, from {@code jobj-copy} and {@code jobj-compare}, and the command line distribution
+ * ships whatever the runtime class path holds. Up to mystic-crypt 13.6 they arrived at 2.16.0-rc1 and
+ * 1.9.4 and a dependency constraint raised them; since 13.7 the libraries bring 2.22.4 and 1.11.0
+ * themselves, and the constraint is gone. Dependabot cannot open a fix for a dependency nobody
+ * declares, so the floor is held here, against the class path the tests run on, which holds the same
+ * resolved versions as the runtime one: a library that brought a lower version back fails it.
  */
 class RuntimeDependenciesTest
 {

@@ -162,6 +162,7 @@ So that a report can start from what is known rather than from zero:
   repository is a real key.
 - **CodeQL** runs on every push and pull request to `develop`, plus weekly.
 - **Dependabot security updates** are enabled. A dependency that arrives only transitively, through
-  a library of the family, is one Dependabot cannot fix; its floor is held in `build.gradle` until the
+  a library of the family, is one Dependabot cannot fix: its floor is held in `build.gradle` until the
   library that declares it moves, and `RuntimeDependenciesTest` fails when the archive would ship a
-  version below it (#231).
+  version below it. jackson and commons-beanutils were held that way until mystic-crypt 13.7 brought
+  fixed versions (#231).
