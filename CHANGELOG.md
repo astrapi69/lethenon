@@ -50,6 +50,76 @@ CHANGED:
   The note in the Raspberry Pi section of `docs/testnet.md` that this was being checked is gone, and
   the section names the result
 
+Version 0.6.1
+-------------
+
+SECURITY:
+
+- **Replace 0.6.0 and 0.5.0 with this release.** The command line distribution of both, the first two
+  releases that carried one, ships in `lib/` versions with published vulnerabilities (#231):
+  jackson-databind and jackson-core 2.16.0-rc1, a release candidate, and commons-beanutils 1.9.4. For
+  these the GitHub Advisory Database and OSV list, as of 2026-10-21:
+  - jackson-databind 2.16.0-rc1: twelve, among them CVE-2026-91777, CVE-2026-91776 and CVE-2026-68497
+    (high);
+  - jackson-core 2.16.0-rc1: CVE-2026-89425 and CVE-2026-68494 (high), CVE-2026-18401;
+  - commons-beanutils 1.9.4: CVE-2025-48734 (high).
+
+  lethenon does not call either library itself. They come with mystic-crypt, through randomizer and
+  jobj-copy, and through file-worker and jobj-compare, and they are on the class path of every node and
+  every command; whether a path through lethenon reaches the vulnerable code was not examined. 0.6.1 is
+  0.6.0 with this alone changed: it depends on mystic-crypt 13.7 and ships jackson 2.22.4 and
+  commons-beanutils 1.11.0, for which neither database lists an advisory. Measured on the published
+  archives (their `.sha256` checked, and the signatures of 0.6.0's): `lethenon-0.6.0.zip`,
+  `lethenon-0.6.0.tar.gz` and `lethenon-0.5.0.tar.gz` all carry the three versions above.
+
+FORMAT:
+
+- **Nothing changes in what is written.** No source file of lethenon changed since 0.6.0
+  (`git diff --stat RELEASE-0.6.0 RELEASE-0.6.1 -- src/main` is empty); the chain database, the wallet
+  file, the block encoding, HELLO and the peer list are those of 0.6.0.
+- **Measured on the release, against the published 0.6.0, in both directions.** 0.6.0 is the tar.gz of
+  the GitHub release, its `.sha256` checked and its signature a valid one by the signing subkey; 0.6.1
+  was built from the release commit with the full gate.
+  - Each version wrote a test chain of four blocks: an Ed25519 transfer of 12.5 LETH, 20 LETH to a
+    published address and its sweep, and 100 LETH to the holder's ML-DSA-65 account with 5 LETH from
+    it. Each reads the other's chain to the same 17.5 LETH and 20 LETH and the same supply, and leaves
+    the file unchanged by reading.
+  - Each mines a transfer the other left waiting, into block 4, and the other reads the recipient's
+    24.5 LETH back from it. Each reads the other's wallets.
+  - In a network namespace of its own (`unshare -rn`): `sync` from a node of the other version takes
+    the whole chain in both directions, and replays to the same blocks, transfers and supply. A node of
+    one version, peer of a miner of the other, took every block the miner mined: 207 blocks from a
+    miner of 0.6.1, 210 from a miner of 0.6.0.
+  - 63 lines in `results.tsv`, none a mismatch. The scripts and their output are in the release pull
+    request.
+- **The consumer**, mystic-crypt-ui's develop with lethenon 0.6.1 from the release commit
+  (`make bump-check`): its unit suite and all 14 internal plugins green, the lethenon plugin among them
+  with 28 classes and 244 tests.
+- **The full gate** on the release commit (`./gradlew clean build`): 85 classes, 835 tests, 0 failures.
+  The archive's `lib/` holds `jackson-databind-2.22.4.jar`, `jackson-core-2.22.4.jar`,
+  `jackson-annotations-2.22.jar`, `commons-beanutils-1.11.0.jar` and `mystic-crypt-13.7.jar`.
+- **The crash gate**, a thousand runs per test on the release commit
+  (`./gradlew test --tests '*ChainCrashTest' --tests '*PowerCutTest' -PcrashRuns=1000`):
+
+  | test | Linux x86_64 | ARM64 |
+  |---|---|---|
+  | kill -9 while blocks are written | 1000 runs, 984 inside a write, 0 broken | 1000 runs, 972 inside a write, 0 broken |
+  | kill -9 while a fork is rolled back | 1000 runs, 990 inside a write, 0 broken | 1000 runs, 977 inside a write, 0 broken |
+  | power cut while blocks are written | 5000 disks, 4940 inside a write, 0 broken | 5000 disks, 4925 inside a write, 0 broken |
+  | power cut while a fork is rolled back | 5000 disks, 4960 inside a write, 0 broken | 5000 disks, 4940 inside a write, 0 broken |
+
+  x86_64 ran alone, with `java.io.tmpdir` on a disk with room: the harness of these tests can call a
+  whole chain broken when a run under heavy load loses the writer's last lines (#240), and it leaves one
+  copy of sqlite-jdbc's native library per killed writer behind (#241). ARM64 ran on a GitHub-hosted
+  `ubuntu-24.04-arm` runner (aarch64, 4 cores, `CPU part 0xd49`, Temurin 25.0.4.1), as for 0.6.0, and the
+  whole build on the same machine: 85 classes, 835 tests, 0 failures.
+
+CHANGED:
+
+- mystic-crypt 13.5 -> 13.7 (#231): through randomizer 10.6 and jobj-copy 4.3, and file-worker 19.1 and
+  jobj-compare 12, it now brings jackson 2.22.4 and commons-beanutils 1.11.0.
+  `RuntimeDependenciesTest` fails when the archive would ship a version below those.
+
 Version 0.6.0
 -------------
 
