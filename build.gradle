@@ -98,6 +98,11 @@ test {
     if (crashRuns != null) {
         systemProperty 'lethenon.crashRuns', crashRuns
     }
+    // a failed assertion with its message, not only its class and line: PowerCutTest failed once in
+    // CI and the log could not say whether a chain broke or too few kills landed inside a write (#237)
+    testLogging {
+        exceptionFormat = 'full'
+    }
 }
 
 /**
