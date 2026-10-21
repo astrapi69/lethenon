@@ -31,3 +31,14 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/develop' }}
       - name: Build
         run: ./gradlew build
+      # what a failed test said, kept: the XML holds each test's standard output, which the log does
+      # not show, and a rerun replaces it (#237)
+      - name: Keep the test results of a failed build
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            build/test-results/test
+            build/reports/tests
+          if-no-files-found: ignore
