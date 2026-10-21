@@ -101,6 +101,20 @@ a release runs them a thousand times:
 ./gradlew test --tests '*ChainCrashTest' --tests '*PowerCutTest' -PcrashRuns=1000
 ```
 
+Every writer the tests kill unpacks sqlite-jdbc's native library, 1.1 MB, and a writer killed with
+SIGKILL never deletes it. The writers unpack it into the test's own temporary directory
+(`org.sqlite.tmpdir`), which JUnit removes after each test; until #240 it went to `java.io.tmpdir`
+and stayed there, one copy per run. A test holds its copies, and its disks, until it ends: a thousand
+runs end with a thousand copies, 1.1 GB (1,000 x 1,097,664 bytes). In the soak run of #240, 3,000 runs
+per test, the highest sample of the temporary directory, taken every 20 seconds, was 2.86 GB.
+On a machine whose `/tmp` is a small tmpfs or has a quota, give the tests a temporary directory on a
+disk with room:
+
+```sh
+JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=<a directory on a disk with room> \
+  ./gradlew test --tests '*ChainCrashTest' --tests '*PowerCutTest' -PcrashRuns=1000
+```
+
 On db0b4bf, 2026-10-16 08:55 to 09:19 UTC, Linux x86_64: 4 tests, 0 failures, 23 min 37 s.
 
 | test | runs | killed inside a write | broken |

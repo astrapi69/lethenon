@@ -91,7 +91,7 @@ class ChainCrashTest
 				ChainWriterProcess.waitingFor(1, ChainWriterProcess.transfers(1)));
 			CrashRuns.Killed killed = CrashRuns.killAtRandom(
 				List.of("grow", database.toString(), chain.toString()), Map.of(), random,
-				database.resolveSibling("errors.txt"));
+				database.resolveSibling("errors.txt"), database.getParent());
 			outcome.count(killed, checkGrown(database, killed));
 		}
 		outcome.assertAllWhole();
@@ -110,7 +110,7 @@ class ChainCrashTest
 			Path database = prepared(directory.resolve("run-" + run), first, List.of());
 			CrashRuns.Killed killed = CrashRuns.killAtRandom(
 				List.of("fork", database.toString(), firstChain.toString(), secondChain.toString()),
-				Map.of(), random, database.resolveSibling("errors.txt"));
+				Map.of(), random, database.resolveSibling("errors.txt"), database.getParent());
 			outcome.count(killed, checkForked(database, killed));
 		}
 		outcome.assertAllWhole();
@@ -235,6 +235,8 @@ class ChainCrashTest
 
 		private int exitedByItself;
 
+		private int outputCutShort;
+
 		Outcome(final String name)
 		{
 			this(name, "runs");
@@ -251,6 +253,7 @@ class ChainCrashTest
 			runs++;
 			insideAWrite += killed.insideAWrite() ? 1 : 0;
 			exitedByItself += killed.exitedByItself() ? 1 : 0;
+			outputCutShort += killed.outputCutShort() ? 1 : 0;
 			if (problem != null)
 			{
 				broken.add(unit.substring(0, unit.length() - 1) + " " + runs + " (begun " + killed.lastBegun() + ", done "
@@ -262,8 +265,10 @@ class ChainCrashTest
 		{
 			String summary = name + ": " + runs + " " + unit + ", " + insideAWrite
 				+ " killed inside a write, " + exitedByItself + " ended before the kill, "
-				+ broken.size() + " broken";
+				+ outputCutShort + " with the output cut short, " + broken.size() + " broken";
 			System.out.println(summary);
+			assertEquals(0, outputCutShort, "a run whose output was cut short cannot tell a whole "
+				+ "chain from a broken one (#240): " + summary);
 			assertEquals(List.of(), broken, summary);
 			assertTrue(insideAWrite * 2 >= runs, "a test that rarely kills inside a write proves "
 				+ "little: " + summary);

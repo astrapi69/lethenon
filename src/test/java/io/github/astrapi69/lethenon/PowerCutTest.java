@@ -63,6 +63,9 @@ import org.junit.jupiter.api.io.TempDir;
  * that SQLite rebuilds when the last connection is gone, and it lives in memory mapped pages, which
  * no record sees.
  * <p>
+ * The writer unpacks sqlite-jdbc's native library into the test's directory, outside the run
+ * directory the shim records, so the library is no part of any disk (#240).
+ * <p>
  * Runs on Linux with a C compiler; elsewhere it is skipped and says why.
  */
 class PowerCutTest
@@ -120,7 +123,8 @@ class PowerCutTest
 			Map<String, byte[]> before = filesIn(runDirectory);
 			CrashRuns.Killed killed = CrashRuns.killAtRandom(
 				List.of("grow", database.toString(), chain.toString()),
-				recording(runDirectory), random, directory.resolve("errors-" + run + ".txt"));
+				recording(runDirectory), random, directory.resolve("errors-" + run + ".txt"),
+				directory);
 			List<Operation> operations = Operation.read(recordOf(runDirectory));
 			for (int disk = 0; disk < DISKS_PER_RUN; disk++)
 			{
@@ -151,7 +155,8 @@ class PowerCutTest
 			CrashRuns.Killed killed = CrashRuns.killAtRandom(
 				List.of("fork", database.toString(), firstChain.toString(),
 					secondChain.toString()),
-				recording(runDirectory), random, directory.resolve("errors-" + run + ".txt"));
+				recording(runDirectory), random, directory.resolve("errors-" + run + ".txt"),
+				directory);
 			List<Operation> operations = Operation.read(recordOf(runDirectory));
 			for (int disk = 0; disk < DISKS_PER_RUN; disk++)
 			{
