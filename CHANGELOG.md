@@ -1,8 +1,32 @@
 ## Change log
 ----------------------
 
-Version 0.7.0 (unreleased)
+Version 0.7.0
 -------------
+
+**0.7.0 brings a way back to 0.5.0** (#224): `lethenon export` writes the chain database as a chain
+file of 0.5.0, so a chain that 0.6.x migrated can be read by 0.5.0 again. Nothing changes in what is
+written: 0.6.1 and 0.7.0 read each other's chains, wallets and blocks, and talk to each other. Also in
+this release: a chain file of 0.5.0 whose blocks do not fit together is refused before the migration
+(#216), a security policy (#228), and crash tests that no longer raise a false alarm (#240).
+
+SECURITY:
+
+- **0.6.1 already closed the hole; 0.7.0 keeps the corrected libraries.** 0.6.0 and 0.5.0 ship
+  jackson-databind and jackson-core 2.16.0-rc1 and commons-beanutils 1.9.4 in their command line
+  distribution, versions with published vulnerabilities (#231). 0.6.1, released on 2026-10-21, replaced
+  them with jackson 2.22.4 and commons-beanutils 1.11.0; its entry lists the advisories. 0.7.0 ships
+  the same corrected versions, and `RuntimeDependenciesTest` fails a build whose runtime class path
+  would carry lower ones. Whoever still runs 0.6.0 or 0.5.0 moves to 0.6.1 or to this release.
+  LIB_LINE
+
+FORMAT:
+
+- **Nothing changes in what is written.** The chain database (ADR 0006), the wallet file, the block
+  encoding, HELLO and the peer list are those of 0.6.1.
+COMPAT_LINES
+ROUNDTRIP_LINES
+CRASHGATE_LINES
 
 ADDED:
 
@@ -22,6 +46,8 @@ ADDED:
 
   The reading of the pending file of 0.5.0 moved into one class that the migration and the export
   share.
+- a security policy (#228): `SECURITY.md` says which versions get fixes and how to report a
+  vulnerability privately, through GitHub's private vulnerability reporting
 
 FIXED:
 
@@ -63,6 +89,18 @@ CHANGED:
   GitHub release. A thousand runs per test, 0 broken (`docs/measurements/0006-chain-database/README.md`).
   The note in the Raspberry Pi section of `docs/testnet.md` that this was being checked is gone, and
   the section names the result
+
+KNOWN AND NOT FIXED:
+
+- `node --mine` computes on one thread (#201)
+- rarely, `OnionConnectTimeTest` fails after 10 s, and the run then hangs for most of an hour; a wait
+  that runs out now names the wall clock and every thread, not reproduced since (#212)
+- `PowerCutTest` failed once in CI without saying which assertion (#237); a failed test now says why,
+  and a run whose output was cut short, the false alarm of #240, now names itself
+- a node or command that migrates a chain file of 0.5.0 prints no line about it (#219)
+- every process that is killed leaves a 1.1 MB copy of sqlite-jdbc's native library in
+  `java.io.tmpdir` (#241)
+- a host that loads lethenon in a class loader of its own finds no SQLite driver (#223)
 
 Version 0.6.1
 -------------
