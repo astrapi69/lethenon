@@ -153,6 +153,25 @@ only the launcher's jar, so each writer ended before it could be killed: 0 kille
 little"). It said nothing about 0.6.0, and it was run again with the class path in
 `java.class.path`.
 
+**Against the published 0.6.1, on ARM64**, 2026-10-21 12:36 to 12:59 UTC, after the release, with the
+same workflow pointed at `RELEASE-0.6.1` (run 39600825517, from a throwaway branch, deleted
+afterwards):
+- The machine: the same kind of runner (aarch64, 4 cores, `CPU part 0xd49`, Temurin 25.0.4.1).
+- The test classes were compiled at `RELEASE-0.6.1`.
+- The classes under test came from the `lib/` of `lethenon-0.6.1.tar.gz` on the GitHub release:
+  - signature by the subkey checked (`VALIDSIG 6D67...BD8D`), and `sha256sum -c` passed;
+  - its jar byte for byte the one on Maven Central (`cmp`, sha1 `b0b42146...`);
+  - a probe showed `ChainDatabase` and `ChainFile` loaded from that jar.
+
+4 tests, 0 failures, 0 skipped, 23 min 3 s:
+
+| test | runs | killed inside a write | broken |
+|---|---|---|---|
+| kill -9 while blocks are written | 1000 | 965 | 0 |
+| kill -9 while a fork is rolled back | 1000 | 990 | 0 |
+| power cut while blocks are written | 5000 disks from 1000 runs | 4910 | 0 |
+| power cut while a fork is rolled back | 5000 disks from 1000 runs | 4925 | 0 |
+
 What this does not cover: a Raspberry Pi itself, an SD card, and a real power cut. `PowerCutTest`
 builds the disks a cut could leave from the recorded writes and syncs, after the model of SQLite's
 own crash tests; no disk lost its power.

@@ -41,6 +41,10 @@ FIXED:
 
 CHANGED:
 
+- `docs/testnet.md` points at the published 0.6.1, the release that replaces 0.6.0 (#231): its section
+  1 ran word for word against `RELEASE-0.6.1`. The crash gate of #202 ran on ARM64 against the
+  published 0.6.1 as it did against 0.6.0, 0 broken
+  (`docs/measurements/0006-chain-database/README.md`)
 - `docs/testnet.md` points at the published 0.6.0: its section 1 ran word for word against the GitHub
   release `RELEASE-0.6.0`, and a short section says what happens to a chain file of 0.5.0 on the first
   start of 0.6.0, that 0.5.0 cannot read the chain after that, and how to keep a way back
