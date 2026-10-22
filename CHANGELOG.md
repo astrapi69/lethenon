@@ -4,6 +4,21 @@
 Version 0.8.0 (unreleased)
 -------------
 
+FIXED:
+
+- a node binds its port with SO_REUSEADDR, set rather than left to the platform (#247): the side of a
+  TCP connection that closes first keeps it in TIME_WAIT for a minute, and a seed node restarted on its
+  fixed port meets exactly that. Java sets the option on Linux by default, but `ServerSocket` leaves the
+  initial value undefined. `ListenAgainTest` binds a port whose last connection is in TIME_WAIT, read
+  from `/proc/net`; with the option off it fails with "Address already in use"
+- `RedialTest` no longer fails rarely with "Address already in use" (#247), as it did in the publish
+  run of `RELEASE-0.7.0`. Both of its tests let a port go and bound it again while the node under test
+  dialled it, and a connection could be given that port as its local port meanwhile, which SO_REUSEADDR
+  does not help against. The disconnect test now keeps its peer listening and drops only the
+  connection; the test of an unreachable peer holds the port with a bound socket that does not listen.
+  Measured over 1000 runs of each test: 0 failures; a socket without SO_REUSEADDR took a released port
+  in 1000 of 1000 tries and a held one in none
+
 CHANGED:
 
 - `docs/testnet.md` points at the published 0.7.0: its section 1 ran word for word against
