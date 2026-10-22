@@ -1,6 +1,15 @@
 ## Change log
 ----------------------
 
+Version 0.8.0 (unreleased)
+-------------
+
+CHANGED:
+
+- `docs/testnet.md` points at the published 0.7.0: its section 1 ran word for word against
+  `RELEASE-0.7.0`. The crash gate of #202 ran on ARM64 against the published 0.7.0 as against 0.6.0 and
+  0.6.1, 0 broken (`docs/measurements/0006-chain-database/README.md`)
+
 Version 0.7.0
 -------------
 
