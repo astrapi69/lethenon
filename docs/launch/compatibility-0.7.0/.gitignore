@@ -1,0 +1,8 @@
+/old/
+/wt-*/
+/run/
+/run-roundtrip/
+/probes/out*/
+*.log
+results.tsv
+results-roundtrip.tsv

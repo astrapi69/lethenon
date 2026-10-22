@@ -23,6 +23,23 @@ start day (ADR 0005).
 `lethenon-1` (commit 2e1076c, 2026-10-01). It is not regenerated: it is the evidence that a chain
 started under the rules before 0.4.0 is refused, and with that reason, by this build (#137).
 
+`written-by-0.5.0.lethenon` and `written-by-0.5.0.lethenon.pending` are a chain file and its pending
+file as the published 0.5.0 wrote them: its command line from the release tag, with the
+`lethenon-0.5.0.jar` from Maven Central checked against Central's sha1 (`6cf3809b…`). It is a test chain
+of four blocks with five transfers: Ed25519 between accounts, one to a published address and its sweep, one
+from an ML-DSA-65 account. Three transfers wait in the pending file: an Ed25519 one, an ML-DSA-65 one, and
+one from the swept account. 9289 and 5937 bytes, sha256 `9a517f11…` and `5f204614…`
+(`sha256sum src/test/resources/chain/written-by-0.5.0.lethenon*`). Written for the round trip before
+mystic-crypt-ui 8.10; the commands are in #224.
+
+`lethenon-test-2-at-0.5.0.lethenon` is the test network's chain as 0.5.0 left it: the maintainer's
+node's chain file of 2026-10-16, taken from the backup before the upgrade to 0.6.0 and checked against
+that backup's sha256. 733 blocks, 155906 bytes, sha256 `03ef0556…`; no pending file, nothing was waiting.
+
+These three files are not regenerated. They are what the old program wrote, and the export of #224
+has to write the same bytes again (`ChainExportTest`). Computing the expected bytes here would compare
+the export with this build's idea of 0.5.0 instead of 0.5.0.
+
 `lethenon-test-2-genesis.lethenon` is the genesis block of the test network that runs since
 2026-10-15, 220 bytes, the first block of the maintainer's chain at home. Its hash,
 `0093b8db1a0cf9be2d5203659d80b42f105d2e322a1850f13da26579df411d6e`, is the one seed node 1 announced in

@@ -25,13 +25,11 @@
 package io.github.astrapi69.lethenon;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -45,6 +43,10 @@ import java.util.Locale;
  * name. A crash at any point leaves one of two states, both of which the next start completes: the
  * old chain file still in place, which migrates again from the start, or a compared database next
  * to a {@code .legacy} file, which is compared once more and put in place.
+ * <p>
+ * A chain file whose blocks do not fit together is refused before anything is written, as a chain
+ * that does not verify, naming the file (#216): the database would refuse it after the copy, and
+ * then the message would name the copy, and the copy would be left behind.
  */
 final class ChainMigration
 {
@@ -74,10 +76,13 @@ final class ChainMigration
 	 *             the old files are then where they were
 	 * @throws IllegalArgumentException
 	 *             when the old files cannot be decoded
+	 * @throws ChainRejected
+	 *             when the blocks of the chain file do not fit together; nothing is written then
 	 */
 	void run() throws IOException
 	{
 		List<BlockBody> blocks = CanonicalEncoding.readChain(Files.readAllBytes(chain));
+		requireTheBlocksFitTogether(blocks);
 		List<SignedTransaction> waiting = legacyWaiting();
 		ChainDatabase.delete(migrating());
 		new ChainDatabase(migrating()).change(blocks, waiting);
@@ -101,6 +106,36 @@ final class ChainMigration
 		List<BlockBody> blocks = CanonicalEncoding.readChain(Files.readAllBytes(legacy()));
 		requireTheSame(blocks, legacyWaiting());
 		takeThePlace();
+	}
+
+	/**
+	 * Checks what the database checks on every read - each block at its height, naming the block
+	 * below it - on the old chain file, before the copy is made. Whether the chain follows the
+	 * consensus rules is the replay's question, asked after the migration as on every read
+	 */
+	private void requireTheBlocksFitTogether(final List<BlockBody> blocks)
+	{
+		Bytes below = null;
+		for (int position = 0; position < blocks.size(); position++)
+		{
+			BlockBody block = blocks.get(position);
+			if (block.height() != position)
+			{
+				throw notMigrated("block " + position + " claims height " + block.height());
+			}
+			if (below != null && !below.equals(block.previousHash()))
+			{
+				throw notMigrated("block " + position + " names " + block.previousHash()
+					+ " as the previous hash, and the block before it hashes to " + below);
+			}
+			below = Blocks.hashOf(block);
+		}
+	}
+
+	private ChainRejected notMigrated(final String reason)
+	{
+		return new ChainRejected(chain.toAbsolutePath() + ": " + reason
+			+ "; the chain file is left as it was, and it was not migrated");
 	}
 
 	private void takeThePlace() throws IOException
@@ -157,22 +192,7 @@ final class ChainMigration
 		{
 			return List.of();
 		}
-		ByteBuffer buffer = ByteBuffer.wrap(Files.readAllBytes(file));
-		byte version = buffer.get();
-		if (version != ChainFile.PENDING_VERSION)
-		{
-			throw new IllegalArgumentException(file + " is pending-file version " + version
-				+ " and this build reads version " + ChainFile.PENDING_VERSION);
-		}
-		int count = buffer.getInt();
-		List<SignedTransaction> transfers = new ArrayList<>(count);
-		for (int index = 0; index < count; index++)
-		{
-			byte[] encoded = new byte[buffer.getInt()];
-			buffer.get(encoded);
-			transfers.add(CanonicalEncoding.readSignedTransaction(encoded));
-		}
-		return transfers;
+		return LegacyPendingFile.read(file);
 	}
 
 	private static void move(final Path from, final Path to) throws IOException

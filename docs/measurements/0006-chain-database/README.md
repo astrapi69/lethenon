@@ -101,6 +101,20 @@ a release runs them a thousand times:
 ./gradlew test --tests '*ChainCrashTest' --tests '*PowerCutTest' -PcrashRuns=1000
 ```
 
+Every writer the tests kill unpacks sqlite-jdbc's native library, 1.1 MB, and a writer killed with
+SIGKILL never deletes it. The writers unpack it into the test's own temporary directory
+(`org.sqlite.tmpdir`), which JUnit removes after each test; until #240 it went to `java.io.tmpdir`
+and stayed there, one copy per run. A test holds its copies, and its disks, until it ends: a thousand
+runs end with a thousand copies, 1.1 GB (1,000 x 1,097,664 bytes). In the soak run of #240, 3,000 runs
+per test, the highest sample of the temporary directory, taken every 20 seconds, was 2.86 GB.
+On a machine whose `/tmp` is a small tmpfs or has a quota, give the tests a temporary directory on a
+disk with room:
+
+```sh
+JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=<a directory on a disk with room> \
+  ./gradlew test --tests '*ChainCrashTest' --tests '*PowerCutTest' -PcrashRuns=1000
+```
+
 On db0b4bf, 2026-10-16 08:55 to 09:19 UTC, Linux x86_64: 4 tests, 0 failures, 23 min 37 s.
 
 | test | runs | killed inside a write | broken |
@@ -128,6 +142,49 @@ it preloaded (0 skipped, 5000 disks per test). sqlite-jdbc took its own `Linux/a
 The whole suite ran on the same machine afterwards: 84 classes, 829 tests, 0 failures. A first run of
 the same workflow passed as well (22 min 26 s); its counts were lost, because the whole suite
 overwrote that step's XML.
+
+**Against the published 0.6.0, on ARM64**, 2026-10-16 16:03 to 16:27 UTC, after the release:
+- The machine: the same kind of runner (aarch64, `CPU part 0xd49`).
+- The test classes were compiled at `RELEASE-0.6.0`.
+- The classes under test came from the `lib/` of `lethenon-0.6.0.tar.gz` on the GitHub release:
+  - signature by the subkey checked (`VALIDSIG 6D67...BD8D`), and `sha256sum -c` passed;
+  - its jar byte for byte the one on Maven Central (`cmp`, sha1 `1851d54e...`);
+  - a probe showed `ChainDatabase` and `ChainFile` loaded from that jar.
+- The tests and the writer process they kill ran with that class path, through the JUnit console launcher.
+
+4 tests, 0 failures, 0 skipped, 22 min 42 s:
+
+| test | runs | killed inside a write | broken |
+|---|---|---|---|
+| kill -9 while blocks are written | 1000 | 973 | 0 |
+| kill -9 while a fork is rolled back | 1000 | 989 | 0 |
+| power cut while blocks are written | 5000 disks from 1000 runs | 4880 | 0 |
+| power cut while a fork is rolled back | 5000 disks from 1000 runs | 4980 | 0 |
+
+A first attempt started the launcher with `-jar` and `--class-path`. That gave every writer process
+only the launcher's jar, so each writer ended before it could be killed: 0 killed inside a write in
+4 x 1000 runs. The tests refused that themselves ("a test that rarely kills inside a write proves
+little"). It said nothing about 0.6.0, and it was run again with the class path in
+`java.class.path`.
+
+**Against the published 0.6.1, on ARM64**, 2026-10-21 12:36 to 12:59 UTC, after the release, with the
+same workflow pointed at `RELEASE-0.6.1` (run 39600825517, from a throwaway branch, deleted
+afterwards):
+- The machine: the same kind of runner (aarch64, 4 cores, `CPU part 0xd49`, Temurin 25.0.4.1).
+- The test classes were compiled at `RELEASE-0.6.1`.
+- The classes under test came from the `lib/` of `lethenon-0.6.1.tar.gz` on the GitHub release:
+  - signature by the subkey checked (`VALIDSIG 6D67...BD8D`), and `sha256sum -c` passed;
+  - its jar byte for byte the one on Maven Central (`cmp`, sha1 `b0b42146...`);
+  - a probe showed `ChainDatabase` and `ChainFile` loaded from that jar.
+
+4 tests, 0 failures, 0 skipped, 23 min 3 s:
+
+| test | runs | killed inside a write | broken |
+|---|---|---|---|
+| kill -9 while blocks are written | 1000 | 965 | 0 |
+| kill -9 while a fork is rolled back | 1000 | 990 | 0 |
+| power cut while blocks are written | 5000 disks from 1000 runs | 4910 | 0 |
+| power cut while a fork is rolled back | 5000 disks from 1000 runs | 4925 | 0 |
 
 What this does not cover: a Raspberry Pi itself, an SD card, and a real power cut. `PowerCutTest`
 builds the disks a cut could leave from the recorded writes and syncs, after the model of SQLite's

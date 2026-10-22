@@ -38,7 +38,7 @@ The command line comes as `lethenon-X.Y.Z.tar.gz` and `lethenon-X.Y.Z.zip` on th
 with a signature (`.asc`) and checksums (`.sha256`, `.sha512`):
 
 ```sh
-VERSION=0.5.0
+VERSION=0.6.1
 BASE=https://github.com/astrapi69/lethenon/releases/download/RELEASE-$VERSION
 curl -LO "$BASE/lethenon-$VERSION.tar.gz"
 curl -LO "$BASE/lethenon-$VERSION.tar.gz.asc"
@@ -114,6 +114,15 @@ bin/lethenon sync --chain ~/lethenon/testnet.lethenon --peer 185.112.144.29:1848
 `--no-default-peers` makes a node dial nobody but the peers given with `--peer`. It is what you use for
 a test chain of your own (`--no-default-peers --mine` on an empty file). A node whose chain file holds
 a chain of its own never dials the seed nodes anyway.
+
+### Coming from 0.5.0
+
+A chain file that 0.5.0 or earlier wrote is migrated the first time 0.6.0 uses it. 0.6.0 copies it into a
+database, compares it block by block, and keeps the old file beside it as `testnet.lethenon.legacy`.
+**After that, 0.5.0 cannot read the chain any more.** It says only "this build reads block encoding version 2
+and the bytes carry version 83". To be able to go back, copy the chain file somewhere else before the first
+start of 0.6.0. Once the new version runs and its height grows, the `.legacy` file can go. Both of the
+network's own nodes made this step on 2026-10-16, and each migrated 733 blocks identically.
 
 ## 3. Optional: only through Tor
 
@@ -251,6 +260,10 @@ A Raspberry Pi 4 or 5 runs a node, and mines on it, with a **64-bit** operating 
   better still. For trying it out for an afternoon, the SD card is fine.
 - **Memory:** `-Xmx64m` is enough for a node that does not mine, so 1 GB of RAM is plenty. A mining
   node has run with `-Xmx128m`.
+- **Crash safety:** the chain of 0.6.0 was killed mid-write and cut off mid-write in a simulation on ARM64, a
+  thousand times per test, against the published 0.6.0 and again against the published 0.6.1, with
+  nothing broken (`docs/measurements/0006-chain-database/README.md`). Not on a Pi itself, not on an SD
+  card.
 - **Mining** keeps one of the four cores at full load for as long as it runs. Give the Pi a heat sink
   or the official case fan. Without one, the Pi throttles its clock and mines more slowly.
 - Everything else is as above: download and check, first start, Tor, mining, the systemd service.
@@ -271,7 +284,11 @@ Once, on 2026-10-15, on a real ARM64 machine, with the commands of this page
   subkey fingerprints above. On 2026-10-16, after the release, section 1 ran word for word against
   the published `RELEASE-0.5.0`: logged out of GitHub, in an empty directory and an empty keyring,
   on x86-64. `sha256sum -c` printed `lethenon-0.5.0.tar.gz: OK`, gpg (in German) gave a good
-  signature with both fingerprints above, and `bin/lethenon --help` answered.
+  signature with both fingerprints above, and `bin/lethenon --help` answered. The same on the same
+  day against `RELEASE-0.6.0`: `lethenon-0.6.0.tar.gz: OK`, `Good signature` with both fingerprints,
+  and `bin/lethenon --version` printed `lethenon 0.6.0`. And on 2026-10-21 against `RELEASE-0.6.1`,
+  with `curl` and no GitHub login, in an empty directory and an empty keyring:
+  `lethenon-0.6.1.tar.gz: OK`, `Good signature` with both fingerprints, `lethenon 0.6.1`.
 - **2. First start:** with an empty chain file and no `--peer`, the node took the genesis block from
   seed node 1 (`took the genesis block from the peer at 185.112.144.29:18480`), had height 364 at
   its first status line, and followed the seed to 365. It stopped with one refusal, its own public

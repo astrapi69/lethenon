@@ -39,7 +39,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Starts {@link ChainWriterProcess} in a JVM of its own and kills it with SIGKILL, which is what
- * {@code kill -9} sends and what {@link Process#destroyForcibly()} sends on Linux and macOS (#202).
+ * {@code kill -9} sends and what {@link ProcessHandle#destroyForcibly()} sends on Linux and macOS
+ * (#202).
  * <p>
  * How many runs a test makes is the system property {@code lethenon.crashRuns},
  * {@value #DEFAULT_RUNS} by default so that the everyday build stays fast; the gate before a
@@ -80,6 +81,8 @@ final class CrashRuns
 	 *            chooses the moment
 	 * @param errors
 	 *            where the writer's standard error goes
+	 * @param nativeLibraries
+	 *            where the writer unpacks sqlite-jdbc's native library
 	 * @return what the writer said before it died
 	 * @throws IOException
 	 *             if the writer cannot be started
@@ -87,11 +90,46 @@ final class CrashRuns
 	 *             if the test is interrupted
 	 */
 	static Killed killAtRandom(final List<String> arguments, final Map<String, String> environment,
-		final Random random, final Path errors) throws IOException, InterruptedException
+		final Random random, final Path errors, final Path nativeLibraries)
+		throws IOException, InterruptedException
+	{
+		return killAfter("ready", random.nextInt(LONGEST_DELAY_MILLIS), arguments, environment,
+			errors, nativeLibraries);
+	}
+
+	/**
+	 * Starts a writer, waits until it has said the given line, lets it write for the given time,
+	 * kills it
+	 *
+	 * @param line
+	 *            the line to wait for, such as {@code ready}
+	 * @param delayMillis
+	 *            how long the writer goes on after it
+	 * @param arguments
+	 *            the writer's arguments
+	 * @param environment
+	 *            added to the writer's environment
+	 * @param errors
+	 *            where the writer's standard error goes
+	 * @param nativeLibraries
+	 *            where the writer unpacks sqlite-jdbc's native library ({@code org.sqlite.tmpdir}):
+	 *            a writer killed with SIGKILL never deletes its copy, 1.1 MB each, and in
+	 *            {@code java.io.tmpdir} one day of crash runs left 11,401 of them, which filled a
+	 *            quota-bound {@code /tmp} (#240)
+	 * @return what the writer said before it died
+	 * @throws IOException
+	 *             if the writer cannot be started
+	 * @throws InterruptedException
+	 *             if the test is interrupted
+	 */
+	static Killed killAfter(final String line, final int delayMillis, final List<String> arguments,
+		final Map<String, String> environment, final Path errors, final Path nativeLibraries)
+		throws IOException, InterruptedException
 	{
 		List<String> command = new ArrayList<>(List.of(
 			ProcessHandle.current().info().command().orElseThrow(),
-			"--enable-native-access=ALL-UNNAMED", "-Xmx128m", "-cp",
+			"--enable-native-access=ALL-UNNAMED", "-Xmx128m",
+			"-Dorg.sqlite.tmpdir=" + nativeLibraries.toAbsolutePath(), "-cp",
 			System.getProperty("java.class.path"), ChainWriterProcess.class.getName()));
 		command.addAll(arguments);
 		ProcessBuilder builder = new ProcessBuilder(command)
@@ -101,19 +139,47 @@ final class CrashRuns
 		List<String> lines = Collections.synchronizedList(new ArrayList<>());
 		Thread reader = Thread.ofVirtual().start(() -> readLines(writer, lines));
 		long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
-		while (!lines.contains("ready") && writer.isAlive() && System.nanoTime() < until)
+		while (!lines.contains(line) && writer.isAlive() && System.nanoTime() < until)
 		{
 			Thread.sleep(1);
 		}
-		Thread.sleep(random.nextInt(LONGEST_DELAY_MILLIS));
+		Thread.sleep(delayMillis);
 		boolean exitedByItself = !writer.isAlive();
-		writer.destroyForcibly();
-		writer.waitFor();
+		kill(writer);
 		reader.join();
 		return new Killed(List.copyOf(lines), exitedByItself, writer.exitValue());
 	}
 
-	private static void readLines(final Process writer, final List<String> lines)
+	/**
+	 * Kills a process with SIGKILL and waits until it is gone; what it wrote to its standard output
+	 * before stays readable to the end
+	 * <p>
+	 * Through its {@link ProcessHandle}, which only sends the signal. {@link Process#destroyForcibly()}
+	 * also closes the process's streams right after the signal (JDK 25,
+	 * {@code java.lang.ProcessImpl.destroy}), which drops whatever the reader had not read yet: the
+	 * test then saw a writer a step behind where it was, and called a whole chain broken (#240).
+	 *
+	 * @param process
+	 *            the process
+	 * @throws InterruptedException
+	 *             if the test is interrupted
+	 */
+	static void kill(final Process process) throws InterruptedException
+	{
+		process.toHandle().destroyForcibly();
+		process.waitFor();
+	}
+
+	/**
+	 * Reads a process's standard output to its end
+	 *
+	 * @param writer
+	 *            the process
+	 * @param lines
+	 *            where its lines go, and a last line {@code output ended: <reason>} when the output
+	 *            could not be read to its end
+	 */
+	static void readLines(final Process writer, final List<String> lines)
 	{
 		try (BufferedReader out = new BufferedReader(
 			new InputStreamReader(writer.getInputStream(), StandardCharsets.UTF_8)))
@@ -174,6 +240,12 @@ final class CrashRuns
 		boolean insideAWrite()
 		{
 			return lastBegun() > lastDone();
+		}
+
+		/** @return whether its output could not be read to its end, so its last lines are unknown */
+		boolean outputCutShort()
+		{
+			return !lines.isEmpty() && lines.getLast().startsWith("output ended: ");
 		}
 
 		private int last(final String prefix)

@@ -89,12 +89,32 @@ final class Networks
 	 */
 	static void await(final String what, final BooleanSupplier condition)
 	{
-		long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+		await(what, condition, Duration.ofSeconds(10));
+	}
+
+	/**
+	 * Waits until the condition holds, at most the given time.
+	 * <p>
+	 * When the time runs out, the message says how far the wall clock moved meanwhile and where
+	 * every thread stands (#212). The deadline runs on the monotonic clock, which stands still while
+	 * the machine sleeps, and a test report's duration on the wall clock, which does not: a wall
+	 * clock far ahead of the limit is a machine that slept or a JVM that stood still, and the
+	 * threads tell a hang from both.
+	 *
+	 * @throws AssertionError
+	 *             naming what was waited for, when the deadline passes
+	 */
+	static void await(final String what, final BooleanSupplier condition, final Duration limit)
+	{
+		long wallStart = System.currentTimeMillis();
+		long deadline = System.nanoTime() + limit.toNanos();
 		while (!condition.getAsBoolean())
 		{
 			if (System.nanoTime() > deadline)
 			{
-				throw new AssertionError("waited ten seconds for " + what);
+				throw new AssertionError("waited " + readable(limit) + " for " + what
+					+ "; the wall clock moved " + (System.currentTimeMillis() - wallStart)
+					+ " ms meanwhile\n" + threads());
 			}
 			Thread.onSpinWait();
 			try
@@ -107,5 +127,30 @@ final class Networks
 				throw new AssertionError("interrupted while waiting for " + what);
 			}
 		}
+	}
+
+	private static String readable(final Duration limit)
+	{
+		return limit.toMillis() % 1000 == 0 ? limit.toSeconds() + " s" : limit.toMillis() + " ms";
+	}
+
+	/**
+	 * Every thread of this JVM with its state and the top of its stack
+	 */
+	private static String threads()
+	{
+		StringBuilder report = new StringBuilder("threads:");
+		for (java.util.Map.Entry<Thread, StackTraceElement[]> thread : Thread.getAllStackTraces()
+			.entrySet())
+		{
+			report.append("\n\"").append(thread.getKey().getName()).append("\" ")
+				.append(thread.getKey().getState());
+			StackTraceElement[] stack = thread.getValue();
+			for (int frame = 0; frame < Math.min(stack.length, 12); frame++)
+			{
+				report.append("\n    at ").append(stack[frame]);
+			}
+		}
+		return report.toString();
 	}
 }

@@ -319,6 +319,49 @@ class ChainFileTest
 		assertFalse(Files.exists(path));
 	}
 
+	/**
+	 * Chain files of an earlier version whose blocks do not fit together, the shape the consumer
+	 * check of 0.6.0 handed the library (#216)
+	 */
+	static Stream<Arguments> unfittingLegacyChains()
+	{
+		List<BlockBody> chain = TestChains.extended(TestChains.chainWith(Bytes.of(new byte[] { 7 })), 3,
+			"legacy");
+		List<BlockBody> other = TestChains.extended(TestChains.chainWith(Bytes.of(new byte[] { 7 })), 3,
+			"another chain");
+		List<BlockBody> gap = new java.util.ArrayList<>(chain);
+		gap.remove(2);
+		List<BlockBody> foreign = new java.util.ArrayList<>(chain.subList(0, 3));
+		foreign.add(other.get(3));
+		return Stream.of(
+			Arguments.of("a block of another chain on top", foreign,
+				"block 3 names " + other.get(3).previousHash() + " as the previous hash, and the "
+					+ "block before it hashes to " + Blocks.hashOf(chain.get(2))),
+			Arguments.of("a block missing in the middle", gap, "block 2 claims height 3"));
+	}
+
+	@ParameterizedTest(name = "{0}: refused before the migration, the file left as it was")
+	@MethodSource("unfittingLegacyChains")
+	@DisplayName("a chain file of an earlier version whose blocks do not fit together is refused as a chain, naming the file, and nothing is migrated (#216)")
+	void aLegacyChainWhoseBlocksDoNotFitIsRefusedBeforeTheMigration(final String what,
+		final List<BlockBody> blocks, final String reason) throws Exception
+	{
+		Path path = directory.resolve("chain.lethenon");
+		byte[] legacy = CanonicalEncoding.encodeChain(blocks);
+		Files.write(path, legacy);
+
+		ChainRejected refused = assertThrows(ChainRejected.class, () -> new ChainFile(path).read());
+
+		assertTrue(refused.getMessage().startsWith(path.toAbsolutePath().toString()),
+			"the message names the file the person gave: " + refused.getMessage());
+		assertTrue(refused.getMessage().contains(reason), refused.getMessage());
+		assertTrue(refused.getMessage().contains("was not migrated"), refused.getMessage());
+		assertArrayEquals(legacy, Files.readAllBytes(path), "the file stays as it was");
+		assertFalse(Files.exists(directory.resolve("chain.lethenon.migrating")),
+			"a refused migration leaves no database behind");
+		assertFalse(Files.exists(directory.resolve("chain.lethenon.legacy")));
+	}
+
 	@Test
 	void aFileThatIsNeitherAChainNorADatabaseIsRefused_andLeftAsItIs() throws Exception
 	{

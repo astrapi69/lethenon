@@ -41,11 +41,11 @@ import org.junit.jupiter.params.provider.CsvSource;
  * <p>
  * jackson and commons-beanutils are not this project's dependencies: they arrive through
  * mystic-crypt, from {@code jobj-copy} and {@code jobj-compare}, and the command line distribution
- * ships whatever the runtime class path holds. With mystic-crypt 13.5, as in 0.6.0, they arrived at
- * 2.16.0-rc1 and 1.9.4; since 13.7 the libraries bring 2.22.4 and 1.11.0 themselves. Dependabot
- * cannot open a fix for a dependency nobody declares, so the floor is held here, against the class
- * path the tests run on, which holds the same resolved versions as the runtime one: a library that
- * brought a lower version back fails it.
+ * ships whatever the runtime class path holds. Up to mystic-crypt 13.6 they arrived at 2.16.0-rc1 and
+ * 1.9.4 and a dependency constraint raised them; since 13.7 the libraries bring 2.22.4 and 1.11.0
+ * themselves, and the constraint is gone. Dependabot cannot open a fix for a dependency nobody
+ * declares, so the floor is held here, against the class path the tests run on, which holds the same
+ * resolved versions as the runtime one: a library that brought a lower version back fails it.
  */
 class RuntimeDependenciesTest
 {

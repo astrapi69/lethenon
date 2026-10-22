@@ -197,7 +197,9 @@ from there.
 ## Consequences
 
 - A chain written by this version cannot be read by 0.5.0 or earlier; the `.legacy` copy can, as it
-  was at the moment of migration.
+  was at the moment of migration. Since #224, `lethenon export` writes the chain as it is now as a
+  chain file of 0.5.0, with its waiting transfers, byte for byte what 0.5.0 writes; reading that file
+  with this version migrates it again, to the same database row for row.
 - Copying a chain means copying the database while no program has it open, or with SQLite's backup;
   copying the file alone while a node runs can miss the last transactions, which sit in
   `<chain>-wal`.
