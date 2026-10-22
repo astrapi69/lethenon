@@ -186,6 +186,25 @@ afterwards):
 | power cut while blocks are written | 5000 disks from 1000 runs | 4910 | 0 |
 | power cut while a fork is rolled back | 5000 disks from 1000 runs | 4925 | 0 |
 
+**Against the published 0.7.0, on ARM64**, 2026-10-22 11:09 to 11:32 UTC, after the release, with the
+same workflow pointed at `RELEASE-0.7.0` and the harness of #240 (run 39768319094, from a throwaway
+branch, deleted afterwards):
+- The machine: the same kind of runner (aarch64, 4 cores, `CPU part 0xd49`, Temurin 25.0.4.1).
+- The test classes were compiled at `RELEASE-0.7.0`.
+- The classes under test came from the `lib/` of `lethenon-0.7.0.tar.gz` on the GitHub release:
+  - signature by the subkey checked (`VALIDSIG 6D67...BD8D`), and `sha256sum -c` passed;
+  - its jar byte for byte the one on Maven Central (`cmp`, sha1 `2acb0d9a...`);
+  - a probe showed `ChainDatabase` and `ChainFile` loaded from that jar.
+
+4 tests, 0 failures, 0 skipped, 23 min 30 s, no run with its output cut short:
+
+| test | runs | killed inside a write | broken |
+|---|---|---|---|
+| kill -9 while blocks are written | 1000 | 979 | 0 |
+| kill -9 while a fork is rolled back | 1000 | 988 | 0 |
+| power cut while blocks are written | 5000 disks from 1000 runs | 4865 | 0 |
+| power cut while a fork is rolled back | 5000 disks from 1000 runs | 4965 | 0 |
+
 What this does not cover: a Raspberry Pi itself, an SD card, and a real power cut. `PowerCutTest`
 builds the disks a cut could leave from the recorded writes and syncs, after the model of SQLite's
 own crash tests; no disk lost its power.
