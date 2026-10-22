@@ -17,7 +17,7 @@ new line is released, not when a patch version moves.
 
 | Version | Supported          | Required JDK | Built on mystic-crypt / crypt-data / crypt-api |
 |---------|--------------------|--------------|------------------------------------------------|
-| 0.7.x   | :white_check_mark: | 25 and above | DEPS_ROW |
+| 0.7.x   | :white_check_mark: | 25 and above | 13.7 / 13.0 / 10.3                             |
 | < 0.7   | :x:                | 25 and above |                                                |
 
 Before 1.0 a fix may change a format. Where it does, the CHANGELOG says so, and older chain

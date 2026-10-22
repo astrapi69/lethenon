@@ -18,15 +18,65 @@ SECURITY:
   them with jackson 2.22.4 and commons-beanutils 1.11.0; its entry lists the advisories. 0.7.0 ships
   the same corrected versions, and `RuntimeDependenciesTest` fails a build whose runtime class path
   would carry lower ones. Whoever still runs 0.6.0 or 0.5.0 moves to 0.6.1 or to this release.
-  LIB_LINE
+  Measured on the release's archives (`tar tzf`, `unzip -l`): `lib/` holds `jackson-databind-2.22.4.jar`,
+  `jackson-core-2.22.4.jar`, `jackson-annotations-2.22.jar`, `commons-beanutils-1.11.0.jar` and
+  `mystic-crypt-13.7.jar`.
 
 FORMAT:
 
 - **Nothing changes in what is written.** The chain database (ADR 0006), the wallet file, the block
   encoding, HELLO and the peer list are those of 0.6.1.
-COMPAT_LINES
-ROUNDTRIP_LINES
-CRASHGATE_LINES
+- **Measured on the release, against the published 0.6.1, in both directions**
+  (`docs/launch/compatibility-0.7.0/`):
+  - 0.6.1 is the tar.gz of the GitHub release, its `.sha256` and its signature by the release key's
+    signing subkey checked; this one was built from the release commit with the full gate
+    (`./gradlew clean build`: 89 classes, 849 tests, 0 failures).
+  - Each version wrote a test chain of four blocks: an Ed25519 transfer of 12.5 LETH, 20 LETH to a
+    published address and its sweep, and 100 LETH to the holder's ML-DSA-65 account with 5 LETH from
+    it. Both compute the recipient's 17.5 LETH and the address owner's 20 LETH.
+  - **Each version on a chain the other wrote:** the same balances and the same supply, and reading
+    leaves the file as it was. A transfer of 7 LETH left waiting by one version is mined by the other,
+    and the first reads the block back: the recipient holds 24.5 LETH after 5 blocks.
+  - **Wallets in both directions:** each version computes the balances of the other's wallets.
+  - **The network**, in a namespace of its own (`unshare -rn`, loopback only): `sync` from a node of
+    the other version takes the whole chain, and it replays to the same blocks, transfers and supply,
+    in both directions. A miner of one version with a node of the other as its peer: the peer took
+    every block, 210 from a miner of 0.7.0 and 206 from a miner of 0.6.1.
+  - 63 lines in `results.tsv`, none a mismatch. Commands: `bash docs/launch/compatibility-0.7.0/build.sh
+    <release commit>`, then `bash docs/launch/compatibility-0.7.0/measure.sh`.
+- **The way back, measured on the release as a round trip** (`roundtrip.sh` in the same directory): a
+  chain database of the published 0.6.1, exported by 0.7.0 into a chain file of 0.5.0, read by the
+  published 0.5.0, migrated by 0.7.0 into a database again, and read by 0.6.1 once more. 0.5.0 is the
+  tar.gz of its GitHub release, checked as 0.6.1 is. 82 lines in `results-roundtrip.tsv`, 0 failures:
+
+  | chain | blocks / transfers / waiting | export byte for byte | 0.5.0 reads it | second database row for row | balances, nonces, supply in 4 stages | pool |
+  |---|---|---|---|---|---|---|
+  | the test network's chain, copied from the running home node of 0.6.1 | 1954 / 0 / 0, 4 accounts | yes | exit 0, file unchanged | yes | the same | empty in every stage |
+  | the test network's chain as 0.5.0 wrote it (733 blocks), migrated by 0.6.1 | 733 / 0 / 0, 4 accounts | yes, and the file 0.5.0 wrote | exit 0, file unchanged | yes | the same, and as 0.5.0 on its own file | empty |
+  | written by 0.6.1: Ed25519, ML-DSA-65, a published address and its sweep | 4 / 5 / 0, 7 accounts | yes | exit 0, file unchanged | yes | the same | empty |
+  | the same with three transfers waiting | 4 / 5 / 3, 7 accounts | yes, `.pending` too | exit 0, both files unchanged | yes | the same | all 3 in every stage, `.pending.legacy` byte for byte |
+
+  "Byte for byte" is against what the published 0.5.0's own chain writer writes for the same blocks
+  and waiting transfers, read out of the first database. The four stages are 0.6.1 on the first
+  database, 0.5.0 on the export, and 0.7.0 and 0.6.1 on the second database. The export changed
+  nothing in the first database. Command: `bash docs/launch/compatibility-0.7.0/roundtrip.sh
+  [<a running chain database of 0.6.1> [<a chain file 0.5.0 wrote>]]`.
+- **The crash gate**, a thousand runs per test
+  (`./gradlew test --tests '*ChainCrashTest' --tests '*PowerCutTest' -PcrashRuns=1000`), with the
+  harness of #240:
+
+  | test | Linux x86_64 | ARM64 |
+  |---|---|---|
+  | kill -9 while blocks are written | 1000 runs, 986 inside a write, 0 broken | 1000 runs, 975 inside a write, 0 broken |
+  | kill -9 while a fork is rolled back | 1000 runs, 991 inside a write, 0 broken | 1000 runs, 987 inside a write, 0 broken |
+  | power cut while blocks are written | 5000 disks, 4930 inside a write, 0 broken | 5000 disks, 4910 inside a write, 0 broken |
+  | power cut while a fork is rolled back | 5000 disks, 4960 inside a write, 0 broken | 5000 disks, 4945 inside a write, 0 broken |
+
+  No run had its output cut short. x86_64 ran alone, with `java.io.tmpdir` on a disk, on `b609085`,
+  whose code is the release's (`git diff --stat b609085 <release commit> -- src build.gradle
+  settings.gradle gradle` is empty). ARM64 ran on the release commit on a GitHub-hosted
+  `ubuntu-24.04-arm` runner (aarch64, 4 cores, `CPU part 0xd49`, Temurin 25.0.4.1), and the whole build
+  on the same machine: 89 classes, 849 tests, 0 failures.
 
 ADDED:
 
@@ -61,8 +111,8 @@ FIXED:
   while growing and 3,000 while rolling back, 15,000 disks of each power cut test, 0 runs with the
   output cut short, 0 broken, and no copy of the library left in `java.io.tmpdir`
 
-- the command line distribution no longer ships jackson 2.16.0-rc1 and commons-beanutils 1.9.4, which
-  Dependabot flags (#231). Neither is used here: mystic-crypt brings them through randomizer and
+- as in 0.6.1, the command line distribution no longer ships jackson 2.16.0-rc1 and commons-beanutils
+  1.9.4, which Dependabot flags (#231). Neither is used here: mystic-crypt brings them through randomizer and
   jobj-copy, and through file-worker and jobj-compare. Those libraries moved, and lethenon depends on
   mystic-crypt 13.7 now, which brings jackson 2.22.4 and commons-beanutils 1.11.0 (randomizer 10.6 and
   jobj-copy 4.3, file-worker 19.1 and jobj-compare 12); the dependency constraint that raised them in
