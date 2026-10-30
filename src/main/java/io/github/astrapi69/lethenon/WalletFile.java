@@ -117,6 +117,30 @@ public final class WalletFile
 	static void write(final Path file, final Wallet wallet, final char[] password,
 		final Consumer<byte[]> held) throws IOException
 	{
+		Files.write(file, seal(wallet, password, held), StandardOpenOption.CREATE_NEW,
+			StandardOpenOption.WRITE);
+	}
+
+	/**
+	 * Seals a wallet to bytes: the same bytes {@link #write(Path, Wallet, char[])} writes to a file,
+	 * for a host that keeps the sealed wallet in its own store and never writes it out (decision in
+	 * mystic-crypt-ui, docs/decisions/lethenon-wallet-in-vault-2026-10-30.md)
+	 *
+	 * @param wallet
+	 *            the wallet
+	 * @param password
+	 *            the password; read, not modified - the array stays the caller's to wipe
+	 * @return the sealed wallet
+	 */
+	public static byte[] toBytes(final Wallet wallet, final char[] password)
+	{
+		return seal(wallet, password, held -> {
+		});
+	}
+
+	private static byte[] seal(final Wallet wallet, final char[] password,
+		final Consumer<byte[]> held)
+	{
 		byte[] entropy = wallet.entropy();
 		held.accept(entropy);
 		byte[] content = ByteBuffer.allocate(CONTENT_LENGTH).put(MAGIC).put(VERSION).put(entropy)
@@ -125,8 +149,7 @@ public final class WalletFile
 		try
 		{
 			// the envelope reads the password and leaves it alone; the array stays the caller's
-			byte[] sealed = PassphraseEnvelope.encrypt(FILE_MAGIC, content, password);
-			Files.write(file, sealed, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+			return PassphraseEnvelope.encrypt(FILE_MAGIC, content, password);
 		}
 		catch (GeneralSecurityException brokenInstallation)
 		{
@@ -171,12 +194,44 @@ public final class WalletFile
 	static Wallet read(final Path file, final char[] password, final Consumer<byte[]> held)
 		throws IOException
 	{
-		byte[] sealed = Files.readAllBytes(file);
-		byte[] content = open(file, sealed, password);
+		return readContent(file.toString(), Files.readAllBytes(file), password, held);
+	}
+
+	/**
+	 * Opens a wallet from the bytes {@link #toBytes(Wallet, char[])} or the file written by
+	 * {@link #write(Path, Wallet, char[])} produced
+	 *
+	 * @param sealed
+	 *            the sealed wallet; read, not modified
+	 * @param password
+	 *            the password; read, not modified
+	 * @return the wallet
+	 * @throws SecurityException
+	 *             if the password is wrong or the bytes were altered
+	 * @throws IllegalArgumentException
+	 *             if the bytes are not a wallet at all
+	 */
+	public static Wallet read(final byte[] sealed, final char[] password)
+	{
+		try
+		{
+			return readContent("the wallet bytes", sealed, password, held -> {
+			});
+		}
+		catch (IOException cannotHappenForBytes)
+		{
+			throw new IllegalStateException(cannotHappenForBytes);
+		}
+	}
+
+	private static Wallet readContent(final String source, final byte[] sealed,
+		final char[] password, final Consumer<byte[]> held) throws IOException
+	{
+		byte[] content = open(source, sealed, password);
 		held.accept(content);
 		try
 		{
-			requireWalletContent(file, content);
+			requireWalletContent(source, content);
 			return Wallet.ofEntropy(Arrays.copyOfRange(content, MAGIC.length + 1, CONTENT_LENGTH));
 		}
 		finally
@@ -191,12 +246,12 @@ public final class WalletFile
 	 * rewritten, because a migration is an action of the user and not a side effect of reading
 	 * (mystic-crypt#160)
 	 */
-	private static byte[] open(final Path file, final byte[] sealed, final char[] password)
+	private static byte[] open(final String source, final byte[] sealed, final char[] password)
 	{
 		boolean writtenBy010 = PassphraseCryptor.isEncrypted(sealed);
 		if (!writtenBy010 && !PassphraseEnvelope.hasMagic(sealed, FILE_MAGIC))
 		{
-			throw new IllegalArgumentException(file + " is not a wallet file: it is not sealed "
+			throw new IllegalArgumentException(source + " is not a wallet file: it is not sealed "
 				+ "with a password the way a wallet file is");
 		}
 		try
@@ -209,7 +264,7 @@ public final class WalletFile
 		catch (SecurityException refused)
 		{
 			throw new SecurityException(
-				file + " does not open: the password is wrong or the file was altered", refused);
+				source + " does not open: the password is wrong or the file was altered", refused);
 		}
 		catch (GeneralSecurityException brokenInstallation)
 		{
@@ -217,14 +272,14 @@ public final class WalletFile
 		}
 	}
 
-	private static void requireWalletContent(final Path file, final byte[] content)
+	private static void requireWalletContent(final String source, final byte[] content)
 	{
 		boolean wallet = content.length == CONTENT_LENGTH
 			&& Arrays.equals(Arrays.copyOf(content, MAGIC.length), MAGIC)
 			&& content[MAGIC.length] == VERSION;
 		if (!wallet)
 		{
-			throw new IllegalArgumentException(file + " opens with this password, but what it "
+			throw new IllegalArgumentException(source + " opens with this password, but what it "
 				+ "holds is not a lethenon wallet of version " + VERSION);
 		}
 	}
