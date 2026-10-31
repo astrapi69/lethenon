@@ -6,6 +6,10 @@ Version 0.8.0 (unreleased)
 
 FIXED:
 
+- guava 33.7.2 instead of 33.7.1 on the runtime classpath (#262, GHSA-xxph-c9ww-hj94): mystic-crypt 13.7
+  to 13.9, crypt-data 13.0 to 13.2 and crypt-api 10.1 to 10.3, the releases that carry the fixed guava.
+  lethenon deserializes no Java objects, so the advisory's path is not one this code takes; the jar
+  shipped with the distribution all the same
 - a node binds its port with SO_REUSEADDR, set rather than left to the platform (#247): the side of a
   TCP connection that closes first keeps it in TIME_WAIT for a minute, and a seed node restarted on its
   fixed port meets exactly that. Java sets the option on Linux by default, but `ServerSocket` leaves the
