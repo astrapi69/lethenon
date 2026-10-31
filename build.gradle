@@ -147,3 +147,5 @@ tasks.register('writeChainFixtures', JavaExec) {
 
 apply from: "gradle/publishing.gradle"
 apply from: "gradle/distribution.gradle"
+
+apply from: "gradle/test-results-complete.gradle"
