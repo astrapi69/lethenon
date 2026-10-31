@@ -1,7 +1,7 @@
 ## Change log
 ----------------------
 
-Version 0.8.0 (unreleased)
+Version 0.8.0
 -------------
 
 ADDED:

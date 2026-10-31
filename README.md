@@ -33,7 +33,7 @@ there is no liquidity pool and no listing, and a tradeable joke is a financial p
 losers.
 
 ```groovy
-implementation "io.github.astrapi69:lethenon:0.7.0"
+implementation "io.github.astrapi69:lethenon:0.8.0"
 ```
 
 Milestone 5, the desktop plugin, lives in
