@@ -36,6 +36,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvFileSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -149,5 +150,25 @@ class SeedPhraseTest
 		assertEquals(List.of("abandon", "zoo"), List.of(words.getFirst(), words.getLast()));
 		assertTrue(refused.getMessage().contains("instead of " + SeedPhrase.WORD_LIST_SHA_256),
 			refused.getMessage());
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@CsvSource(delimiter = '|', value = { "the first word of the list|abandon|true",
+			"the last word of the list|zoo|true", "a word in capitals|Abandon|true",
+			"a word with spaces around it|'  zoo '|true", "a word that is not in the list|lethenon|false",
+			"one letter short of a word|abando|false", "an empty word|''|false" })
+	void aWordIsKnownOnlyWhenItIsInTheList(final String name, final String word,
+		final boolean known)
+	{
+		assertEquals(known, SeedPhrase.isKnownWord(word));
+	}
+
+	@Test
+	void everyWordOfAPhraseIsKnown()
+	{
+		for (String word : SeedPhrase.fromEntropy(new byte[32]))
+		{
+			assertTrue(SeedPhrase.isKnownWord(word), word);
+		}
 	}
 }
