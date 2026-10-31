@@ -4,6 +4,13 @@
 Version 0.8.0 (unreleased)
 -------------
 
+ADDED:
+
+- `SeedPhrase.isKnownWord(String)` (#259): whether one word is on the English BIP-39 word list,
+  compared as `parse` reads a phrase - surrounding white space and case ignored; false for null, a
+  blank string, more than one word and any other text. A caller can now check a phrase word by word
+  without a copy of the list
+
 FIXED:
 
 - a node binds its port with SO_REUSEADDR, set rather than left to the platform (#247): the side of a

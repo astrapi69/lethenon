@@ -26,6 +26,7 @@ package io.github.astrapi69.lethenon;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -36,6 +37,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvFileSource;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -149,5 +152,34 @@ class SeedPhraseTest
 		assertEquals(List.of("abandon", "zoo"), List.of(words.getFirst(), words.getLast()));
 		assertTrue(refused.getMessage().contains("instead of " + SeedPhrase.WORD_LIST_SHA_256),
 			refused.getMessage());
+	}
+
+	@ParameterizedTest(name = "{0} is a word of the list: {1}")
+	@CsvSource(value = { "abandon, true", "zoo, true", "Abandon, true", "ZOO, true", "'  zoo\t', true",
+			"abandoned, false", "zo, false", "'abandon zoo', false", "'   ', false", "\u00e4bandon, false" })
+	void isKnownWord_answersForTheBip39EnglishList(final String word, final boolean known)
+	{
+		assertEquals(known, SeedPhrase.isKnownWord(word), word);
+	}
+
+	@ParameterizedTest(name = "{0} is no word")
+	@NullAndEmptySource
+	void isKnownWord_isFalseForNoWordAtAll(final String word)
+	{
+		assertFalse(SeedPhrase.isKnownWord(word));
+	}
+
+	@Test
+	void isKnownWord_knowsEveryWordAPhraseIsMadeOf()
+	{
+		byte[] entropy = new byte[32];
+		for (int i = 0; i < entropy.length; i++)
+		{
+			entropy[i] = (byte)(i * 37 + 11);
+		}
+		List<String> words = SeedPhrase.fromEntropy(entropy);
+
+		assertEquals(24, words.size());
+		assertTrue(words.stream().allMatch(SeedPhrase::isKnownWord), words.toString());
 	}
 }

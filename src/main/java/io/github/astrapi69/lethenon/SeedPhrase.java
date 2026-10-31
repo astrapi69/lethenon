@@ -188,6 +188,24 @@ public final class SeedPhrase
 	}
 
 	/**
+	 * Whether a word belongs to the English BIP-39 word list, compared the way {@link #parse(String)}
+	 * reads a phrase: surrounding white space is ignored and case does not matter
+	 *
+	 * @param word
+	 *            the word to look up, may be null
+	 * @return true if it is one of the 2048 words, false for null, an empty or blank string, more
+	 *         than one word or any other text
+	 */
+	public static boolean isKnownWord(final String word)
+	{
+		if (word == null)
+		{
+			return false;
+		}
+		return INDEX.containsKey(word.strip().toLowerCase(Locale.ROOT));
+	}
+
+	/**
 	 * The 64 byte seed of BIP-39: PBKDF2-HMAC-SHA512 over the words, salted with "mnemonic" and
 	 * the passphrase, 2048 rounds, both in Unicode NFKD
 	 *
