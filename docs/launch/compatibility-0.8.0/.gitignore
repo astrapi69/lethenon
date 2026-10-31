@@ -1,0 +1,5 @@
+/old/
+/wt-*/
+/run/
+*.log
+results.tsv
