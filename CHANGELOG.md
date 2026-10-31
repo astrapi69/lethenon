@@ -4,6 +4,16 @@
 Version 0.8.0 (unreleased)
 -------------
 
+ADDED:
+
+- the wallet as bytes (#258): `WalletFile.toBytes(Wallet, char[])` seals a wallet to the bytes of a
+  wallet file, `WalletFile.read(byte[], char[])` opens them, with the same format and the same checks as
+  the path API, which is now written in terms of them. A program that keeps a wallet elsewhere - the
+  vault of mystic-crypt-ui keeps it as an attachment - needs no temporary file
+- `SeedPhrase.isKnownWord(String)`: whether a word is in the BIP-39 English list, read as `parse` reads
+  it. The backup check of mystic-crypt-ui names a misspelled word with its position from it, instead of
+  reading the text of an exception
+
 FIXED:
 
 - a node binds its port with SO_REUSEADDR, set rather than left to the platform (#247): the side of a
