@@ -1,6 +1,97 @@
 ## Change log
 ----------------------
 
+Version 0.8.0
+-------------
+
+**0.8.0 brings the wallet as bytes** (#258), for a program that keeps a wallet somewhere other than a
+file - mystic-crypt-ui keeps it in its vault - and `SeedPhrase.isKnownWord`, for a check that names a
+misspelled word of a seed phrase. Nothing changes in what is written: 0.7.0 and 0.8.0 read each other's
+chains, wallets and blocks, and talk to each other. Also in this release: guava 33.7.2 through
+mystic-crypt 13.9 and crypt-data 13.2 (#262), and a node that binds its port with SO_REUSEADDR (#247).
+
+FORMAT:
+
+- **Nothing changes in what is written.** The chain database (ADR 0006), the wallet file, the block
+  encoding, HELLO and the peer list are those of 0.7.0; the byte API of #258 writes and reads the
+  wallet file's own format, and the path API is written in terms of it.
+- **Measured on the release, against the published 0.7.0, in both directions**
+  (`docs/launch/compatibility-0.8.0/`):
+  - 0.7.0 is the tar.gz of the GitHub release, its `.sha256` and its signature by the release key's
+    signing subkey checked; this one was built from the release commit with the full gate
+    (`./gradlew clean build`: 91 classes, 862 tests, 0 failures, 0 errors, 0 skipped).
+  - Each version wrote a test chain of four blocks: an Ed25519 transfer of 12.5 LETH, 20 LETH to a
+    published address and its sweep, and 100 LETH to the holder's ML-DSA-65 account with 5 LETH from
+    it. Both compute the recipient's 17.5 LETH and the address owner's 20 LETH.
+  - **Each version on a chain the other wrote:** the same balances and the same supply, and reading
+    leaves the file as it was. A transfer of 7 LETH left waiting by one version is mined by the other,
+    and the first reads the block back: the recipient holds 24.5 LETH after 5 blocks.
+  - **Wallets in both directions:** each version computes the balances of the other's wallets.
+  - **The network**, in a namespace of its own (`unshare -rn`, loopback only): `sync` from a node of
+    the other version takes the whole chain, and it replays to the same blocks, transfers and supply,
+    in both directions. A miner of one version with a node of the other as its peer: the peer took
+    every block, 210 from a miner of 0.8.0 and 214 from a miner of 0.7.0.
+  - 63 lines in `results.tsv`, every command exit 0, none a mismatch. Commands: `bash
+    docs/launch/compatibility-0.8.0/build.sh <release commit>`, then `bash
+    docs/launch/compatibility-0.8.0/measure.sh`.
+- **The way back to 0.5.0 is not measured again**: `lethenon export` and the chain database are those
+  of 0.7.0 (`git diff --stat RELEASE-0.7.0 -- src/main/java/io/github/astrapi69/lethenon/ChainDatabase.java
+  src/main/java/io/github/astrapi69/lethenon/ChainExport.java
+  src/main/java/io/github/astrapi69/lethenon/cli/ExportCommand.java` is empty), so 0.7.0's round trip
+  stands for it.
+
+ADDED:
+
+- the wallet as bytes (#258): `WalletFile.toBytes(Wallet, char[])` seals a wallet to the bytes of a
+  wallet file, `WalletFile.read(byte[], char[])` opens them, with the same format and the same checks as
+  the path API, which is now written in terms of them. A program that keeps a wallet elsewhere - the
+  vault of mystic-crypt-ui keeps it as an attachment - needs no temporary file
+- `SeedPhrase.isKnownWord(String)`: whether a word is in the BIP-39 English list, read as `parse` reads
+  it. The backup check of mystic-crypt-ui names a misspelled word with its position from it, instead of
+  reading the text of an exception
+
+FIXED:
+
+- guava 33.7.2 instead of 33.7.1 on the runtime classpath (#262, GHSA-xxph-c9ww-hj94): mystic-crypt 13.7
+  to 13.9, crypt-data 13.0 to 13.2 and crypt-api 10.1 to 10.3, the releases that carry the fixed guava.
+  lethenon deserializes no Java objects, so the advisory's path is not one this code takes; the jar
+  shipped with the distribution all the same
+- a node binds its port with SO_REUSEADDR, set rather than left to the platform (#247): the side of a
+  TCP connection that closes first keeps it in TIME_WAIT for a minute, and a seed node restarted on its
+  fixed port meets exactly that. Java sets the option on Linux by default, but `ServerSocket` leaves the
+  initial value undefined. `ListenAgainTest` binds a port whose last connection is in TIME_WAIT, read
+  from `/proc/net`; with the option off it fails with "Address already in use"
+- `RedialTest` no longer fails rarely with "Address already in use" (#247), as it did in the publish
+  run of `RELEASE-0.7.0`. Both of its tests let a port go and bound it again while the node under test
+  dialled it, and a connection could be given that port as its local port meanwhile, which SO_REUSEADDR
+  does not help against. The disconnect test now keeps its peer listening and drops only the
+  connection; the test of an unreachable peer holds the port with a bound socket that does not listen.
+  Measured over 1000 runs of each test: 0 failures; a socket without SO_REUSEADDR took a released port
+  in 1000 of 1000 tries and a held one in none
+
+CHANGED:
+
+- an upload to the Central Portal leaves only from CI, a release only from its `RELEASE-*` tag (#254),
+  and an upload refuses a signing key that is configured by halves (#256): a Central Portal task of a
+  local build stops with a message instead of uploading. Publishing to the local Maven repository is
+  unchanged
+- CI submits the Gradle dependency graph of the runtime classpath to GitHub (#252), so Dependabot reads
+  what the distribution ships; the guava alert of #262 came from it
+- `docs/testnet.md` points at the published 0.7.0: its section 1 ran word for word against
+  `RELEASE-0.7.0`. The crash gate of #202 ran on ARM64 against the published 0.7.0 as against 0.6.0 and
+  0.6.1, 0 broken (`docs/measurements/0006-chain-database/README.md`)
+
+KNOWN AND NOT FIXED:
+
+- `node --mine` computes on one thread (#201)
+- rarely, `OnionConnectTimeTest` fails after 10 s, and the run then hangs for most of an hour (#212)
+- `PowerCutTest` failed once in CI without saying which assertion (#237)
+- a node or command that migrates a chain file of 0.5.0 prints no line about it (#219)
+- `ChainFile` cannot tell a caller beforehand whether reading a file would migrate it (#222)
+- every process that is killed leaves a 1.1 MB copy of sqlite-jdbc's native library in
+  `java.io.tmpdir` (#241)
+- a host that loads lethenon in a class loader of its own finds no SQLite driver (#223)
+
 Version 0.7.0
 -------------
 

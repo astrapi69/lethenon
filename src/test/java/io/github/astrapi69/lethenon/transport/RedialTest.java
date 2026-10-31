@@ -31,7 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.net.ServerSocket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,13 +63,17 @@ class RedialTest
 
 	private final List<BlockBody> genesis = testGenesis(Bytes.of(new byte[] { 1 }));
 
-	/** A port nothing listens on: bound once to find a free one, then closed */
-	private static int aFreePort() throws IOException
+	/**
+	 * A port held without listening: a dial to it is refused, and no outgoing connection is given it
+	 * as its local port, which a port bound once and released could be while the node dials it
+	 * (#247). With SO_REUSEADDR, so that a node binds the port beside it before it is released.
+	 */
+	private static Socket aHeldPort() throws IOException
 	{
-		try (ServerSocket probe = new ServerSocket(0))
-		{
-			return probe.getLocalPort();
-		}
+		Socket held = new Socket();
+		held.setReuseAddress(true);
+		held.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+		return held;
 	}
 
 	@Test
@@ -75,10 +81,10 @@ class RedialTest
 	void aPeerReachableOnlyAfterTheFirstAttempt_isConnectedOnceItIs()
 		throws IOException, InterruptedException
 	{
-		int port = aFreePort();
-		PeerAddress later = new PeerAddress("127.0.0.1", port);
-		try (Node node = Node.on(genesis).redialingAfter(FIRST, LONGEST))
+		try (Socket held = aHeldPort(); Node node = Node.on(genesis).redialingAfter(FIRST, LONGEST))
 		{
+			int port = held.getLocalPort();
+			PeerAddress later = new PeerAddress("127.0.0.1", port);
 			node.connectAll(List.of(later));
 			assertTrue(node.peers().isEmpty());
 			// the attempts after 100 and 300 ms fail as well, before the peer starts listening
@@ -89,6 +95,7 @@ class RedialTest
 			try (Node peer = Node.on(genesis))
 			{
 				assertEquals(port, peer.listen(port));
+				held.close();
 
 				await("the configured peer, dialled again", () -> node.peers().size() == 1);
 				assertEquals(1, refusalsOf(node, later),
@@ -101,22 +108,15 @@ class RedialTest
 	@DisplayName("a configured peer that disconnects is dialled again")
 	void aConfiguredPeerThatDisconnects_isDialledAgain() throws IOException
 	{
-		try (Node node = Node.on(genesis).redialingAfter(FIRST, LONGEST))
+		try (Node node = Node.on(genesis).redialingAfter(FIRST, LONGEST); Node peer = Node.on(genesis))
 		{
-			int port;
-			try (Node first = Node.on(genesis))
-			{
-				port = first.listen(0);
-				node.connectAll(List.of(new PeerAddress("127.0.0.1", port)));
-				await("the first connection", () -> node.peers().size() == 1);
-			}
-			await("the disconnect", () -> node.peers().isEmpty());
+			int port = peer.listen(0);
+			node.connectAll(List.of(new PeerAddress("127.0.0.1", port)));
+			await("the first connection", () -> node.peers().size() == 1);
 
-			try (Node again = Node.on(genesis))
-			{
-				assertEquals(port, again.listen(port));
-				await("the configured peer, dialled again", () -> node.peers().size() == 1);
-			}
+			peer.dropConnections();
+			await("the disconnect", () -> node.peers().isEmpty());
+			await("the configured peer, dialled again", () -> node.peers().size() == 1);
 		}
 	}
 

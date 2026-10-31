@@ -188,6 +188,20 @@ public final class SeedPhrase
 	}
 
 	/**
+	 * Whether a word is in the BIP-39 English word list, read as {@link #parse} reads it: in lower
+	 * case and without the spaces around it. A program that asks for words one at a time can name a
+	 * misspelled word at once, without reading an error message
+	 *
+	 * @param word
+	 *            the word
+	 * @return true for a word of the list
+	 */
+	public static boolean isKnownWord(final String word)
+	{
+		return INDEX.containsKey(word.strip().toLowerCase(Locale.ROOT));
+	}
+
+	/**
 	 * The 64 byte seed of BIP-39: PBKDF2-HMAC-SHA512 over the words, salted with "mnemonic" and
 	 * the passphrase, 2048 rounds, both in Unicode NFKD
 	 *

@@ -33,7 +33,7 @@ there is no liquidity pool and no listing, and a tradeable joke is a financial p
 losers.
 
 ```groovy
-implementation "io.github.astrapi69:lethenon:0.7.0"
+implementation "io.github.astrapi69:lethenon:0.8.0"
 ```
 
 Milestone 5, the desktop plugin, lives in
@@ -314,8 +314,9 @@ What a release consists of, in the order it is run (0.2.0 was the first one run 
    pom, `-sources.jar`, `-javadoc.jar`, `.module`, and `gpg --verify` on each `.asc`.
 6. **GitHub release** from the CHANGELOG entry: the draft the distribution workflow made, with its
    eight files - the zip and the tar.gz, each with `.asc`, `.sha256` and `.sha512`. The notes come from
-   the CHANGELOG, and the draft is published by the maintainer. Before 0.5.0 a release carried no
-   binaries.
+   the CHANGELOG. The draft is published once step 5 has verified the artifacts on Central, by whoever
+   runs the release; the approval in the Central Portal (step 4) stays the maintainer's. Before 0.5.0 a
+   release carried no binaries.
 7. **`master` follows the release**: a fast-forward to the tagged commit
    (`git push origin "RELEASE-X.Y.Z^{}:master"`), otherwise a merge of the tag on `master`, never a
    force push. Afterwards `git diff RELEASE-X.Y.Z master` is empty. (`master` exists since 0.2.0; the

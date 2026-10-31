@@ -770,6 +770,11 @@ public final class Node implements AutoCloseable
 
 	/**
 	 * Starts accepting connections on the given address only
+	 * <p>
+	 * With SO_REUSEADDR, so that a node binds its port again while the connections of its last run
+	 * on that port wait in TIME_WAIT, as they do for a minute on the side that closed first: a seed
+	 * node restarted on its fixed port. {@link ServerSocket} leaves the initial setting undefined
+	 * (#247).
 	 *
 	 * @param bind
 	 *            the local address to listen on, for example the loopback address an onion service
@@ -783,6 +788,7 @@ public final class Node implements AutoCloseable
 	public int listen(final InetAddress bind, final int port) throws IOException
 	{
 		ServerSocket socket = new ServerSocket();
+		socket.setReuseAddress(true);
 		socket.bind(new InetSocketAddress(bind, port));
 		server = socket;
 		listenPort = socket.getLocalPort();
@@ -1201,6 +1207,18 @@ public final class Node implements AutoCloseable
 	public List<SignedTransaction> pending()
 	{
 		return local.pool().waiting();
+	}
+
+	/**
+	 * Closes every connection and goes on listening, as a peer that drops its connections; tests use
+	 * it to disconnect a peer without giving up the port it listens on (#247)
+	 */
+	void dropConnections()
+	{
+		for (Socket socket : open)
+		{
+			closeQuietly(socket);
+		}
 	}
 
 	/**

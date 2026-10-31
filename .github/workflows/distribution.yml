@@ -3,8 +3,9 @@
 # (gradle/distribution.gradle), on the GitHub release of every version from 0.5.0 on.
 #
 # A RELEASE-* tag builds, signs and verifies the files and attaches them to the GitHub release of the
-# tag. If that release does not exist yet, it is created as a draft; the maintainer writes the notes
-# from CHANGELOG.md and publishes it, as with the Maven Central upload.
+# tag. If that release does not exist yet, it is created as a draft. Its notes come from CHANGELOG.md,
+# and it is published once the artifacts are verified on Maven Central (README, "Releasing", step 6);
+# the approval of the upload in the Central Portal stays the maintainer's.
 #
 # The manual run is the rehearsal: the same build, signatures and verification on develop, uploaded as
 # a workflow artifact and not as a release. Run it after any change to this file or to

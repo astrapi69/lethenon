@@ -38,7 +38,7 @@ The command line comes as `lethenon-X.Y.Z.tar.gz` and `lethenon-X.Y.Z.zip` on th
 with a signature (`.asc`) and checksums (`.sha256`, `.sha512`):
 
 ```sh
-VERSION=0.6.1
+VERSION=0.7.0
 BASE=https://github.com/astrapi69/lethenon/releases/download/RELEASE-$VERSION
 curl -LO "$BASE/lethenon-$VERSION.tar.gz"
 curl -LO "$BASE/lethenon-$VERSION.tar.gz.asc"
@@ -261,7 +261,7 @@ A Raspberry Pi 4 or 5 runs a node, and mines on it, with a **64-bit** operating 
 - **Memory:** `-Xmx64m` is enough for a node that does not mine, so 1 GB of RAM is plenty. A mining
   node has run with `-Xmx128m`.
 - **Crash safety:** the chain of 0.6.0 was killed mid-write and cut off mid-write in a simulation on ARM64, a
-  thousand times per test, against the published 0.6.0 and again against the published 0.6.1, with
+  thousand times per test, against the published 0.6.0, 0.6.1 and 0.7.0, with
   nothing broken (`docs/measurements/0006-chain-database/README.md`). Not on a Pi itself, not on an SD
   card.
 - **Mining** keeps one of the four cores at full load for as long as it runs. Give the Pi a heat sink
@@ -288,7 +288,9 @@ Once, on 2026-10-15, on a real ARM64 machine, with the commands of this page
   day against `RELEASE-0.6.0`: `lethenon-0.6.0.tar.gz: OK`, `Good signature` with both fingerprints,
   and `bin/lethenon --version` printed `lethenon 0.6.0`. And on 2026-10-21 against `RELEASE-0.6.1`,
   with `curl` and no GitHub login, in an empty directory and an empty keyring:
-  `lethenon-0.6.1.tar.gz: OK`, `Good signature` with both fingerprints, `lethenon 0.6.1`.
+  `lethenon-0.6.1.tar.gz: OK`, `Good signature` with both fingerprints, `lethenon 0.6.1`. And on
+  2026-10-22 against `RELEASE-0.7.0`, in the same way: `lethenon-0.7.0.tar.gz: OK`, `Good signature`
+  with both fingerprints, `lethenon 0.7.0`.
 - **2. First start:** with an empty chain file and no `--peer`, the node took the genesis block from
   seed node 1 (`took the genesis block from the peer at 185.112.144.29:18480`), had height 364 at
   its first status line, and followed the seed to 365. It stopped with one refusal, its own public
