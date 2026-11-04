@@ -325,6 +325,12 @@ What a release consists of, in the order it is run (0.2.0 was the first one run 
    "(unreleased)" for whatever `develop` already carries beyond the tag.
 9. **The consumer follows**: mystic-crypt-ui's catalog moves to the release, with `make bump-check`.
 
+## How this project is made
+
+Lethenon is developed with AI agents as a tool, since its start in 2026; its maintainer sets the
+goals, the rules and the architecture, and approves and signs every release. How,
+in full: [How my projects are made](https://github.com/astrapi69/astrapi69/blob/main/AI_USAGE.md).
+
 ## License
 
 MIT.
