@@ -1,0 +1,23 @@
+# The paths a pull request needs the maintainer's label read-by-maintainer to change (#271): the
+# required status maintainer-read is red on a pull request that changes one of them until the
+# maintainer has set the label himself, and every new push removes it. scripts/maintainer-read.py
+# reads this file from the base branch, and only the forms it documents. The workflow and the script
+# are the same files as in astrapi69/mystic-crypt-ui, whose MaintainerReadCheckTest covers them.
+#
+# "Require review from Code Owners" is deliberately not enabled: every pull request comes from the
+# account astrapi69, which is the owner named here, and GitHub does not let an author approve his
+# own pull request. This file is the marking and the single list of the paths, nothing more.
+
+# the consensus and signature rules: what a valid block and transaction are, and how they are signed
+/src/main/java/io/github/astrapi69/lethenon/ConsensusRules.java @astrapi69
+/src/main/java/io/github/astrapi69/lethenon/Genesis.java @astrapi69
+/src/main/java/io/github/astrapi69/lethenon/GenesisAnchor.java @astrapi69
+/src/main/java/io/github/astrapi69/lethenon/SignatureSuite.java @astrapi69
+/src/main/java/io/github/astrapi69/lethenon/SigningPayload.java @astrapi69
+/src/main/java/io/github/astrapi69/lethenon/TransactionSigner.java @astrapi69
+/src/main/java/io/github/astrapi69/lethenon/DeterministicKeys.java @astrapi69
+
+# the check itself, so that a pull request cannot loosen it without the label
+/.github/CODEOWNERS @astrapi69
+/.github/workflows/maintainer-read.yml @astrapi69
+/scripts/maintainer-read.py @astrapi69
