@@ -82,7 +82,7 @@ class CrashRunsTest
 	}
 
 	@Test
-	@DisplayName("a killed writer leaves its copy of sqlite-jdbc's native library where it was told, not in java.io.tmpdir")
+	@DisplayName("a killed writer whose cache cannot hold sqlite-jdbc's native library leaves its copy where it was told, not in java.io.tmpdir")
 	void aKilledWriterLeavesItsNativeLibraryWhereItWasTold() throws Exception
 	{
 		List<BlockBody> trunk = TestChains.extended(TestChains.chainWith(TestChains.MINER), 2,
@@ -93,10 +93,13 @@ class CrashRunsTest
 			directory.resolve("second.chain"));
 		Path database = ChainCrashTest.prepared(directory.resolve("run"), first, List.of());
 		Path libraries = Files.createDirectories(directory.resolve("libraries"));
+		// a cache that is a file cannot hold the library (#241), so sqlite-jdbc extracts its own
+		Path cacheThatIsAFile = Files.writeString(directory.resolve("cache"), "");
 
 		CrashRuns.Killed killed = CrashRuns.killAfter("done 1", 0,
 			List.of("fork", database.toString(), firstChain.toString(), secondChain.toString()),
-			Map.of(), directory.resolve("errors.txt"), libraries);
+			Map.of("XDG_CACHE_HOME", cacheThatIsAFile.toString()), directory.resolve("errors.txt"),
+			libraries);
 
 		assertFalse(killed.exitedByItself(), "the writer ended before the kill: " + killed);
 		assertTrue(killed.lastDone() >= 1, "the writer never finished a write: " + killed);
