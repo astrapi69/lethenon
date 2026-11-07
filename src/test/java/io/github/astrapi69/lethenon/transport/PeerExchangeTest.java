@@ -27,7 +27,6 @@ package io.github.astrapi69.lethenon.transport;
 import static io.github.astrapi69.lethenon.transport.Networks.await;
 import static io.github.astrapi69.lethenon.transport.Networks.testGenesis;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -155,11 +154,17 @@ class PeerExchangeTest
 
 			newcomer.connect("127.0.0.1", hubPort);
 
-			await("the newcomer's outgoing connections full",
+			await(() -> "the newcomer's outgoing connections full; " + newcomer.peers().size()
+				+ " peers, heard of " + newcomer.heardOf() + ", refusals " + newcomer.refusals(),
 				() -> newcomer.peers().size() == Node.MAXIMUM_OUTGOING);
-			assertFalse(newcomer.heardOf().isEmpty(),
-				() -> "the rest stays heard of; " + newcomer.peers().size() + " peers, heard of "
-					+ newcomer.heardOf() + ", refusals " + newcomer.refusals());
+			// the addresses beyond the twelve may reach the newcomer after its twelfth connection
+			// is counted, so the rest being heard of is waited for, not asserted at once (#278)
+			await(() -> "the rest heard of; " + newcomer.peers().size() + " peers, heard of "
+				+ newcomer.heardOf() + ", refusals " + newcomer.refusals(),
+				() -> !newcomer.heardOf().isEmpty());
+			assertTrue(newcomer.peers().size() <= Node.MAXIMUM_OUTGOING,
+				() -> "at most twelve outgoing once the rest is heard of; " + newcomer.peers().size()
+					+ " peers, heard of " + newcomer.heardOf() + ", refusals " + newcomer.refusals());
 		}
 		finally
 		{
