@@ -6,7 +6,8 @@
 #   bash docs/launch/compatibility-0.8.0/build.sh [<commit under test, default HEAD>]
 set -uo pipefail
 C=$(cd "$(dirname "$0")" && pwd)
-UNDER_TEST=${1:-HEAD}
+# the commit under test as a commit id, read in this clone: the worktree below resolves no name
+UNDER_TEST=$(git -C "$C" rev-parse --verify --quiet "${1:-HEAD}^{commit}") || { echo "not a commit: ${1:-HEAD}"; exit 1; }
 PRIMARY=5B2FA6B11E298BC09287F423D8C403518C49CA75
 SUBKEY=6D67F8442A6FCC96BD7C1B5E9FCF7C9710E2BD8D
 O=$C/old; rm -rf "$O"; mkdir -p "$O"
@@ -26,6 +27,17 @@ published() { # version: download, check, unpack into old/
 published 0.7.0; ok=$?
 gpgconf --homedir "$K" --kill gpg-agent; rm -rf "$K"
 [ $ok -eq 0 ] || exit 1
-[ -d "$C/wt-0.8.0" ] || git worktree add -q --detach "$C/wt-0.8.0" "$UNDER_TEST"
-(cd "$C/wt-0.8.0" && ./gradlew clean build installDist --no-watch-fs > "$C/build-0.8.0.log" 2>&1; echo "build 0.8.0 exit=$?" | tee -a "$C/build-0.8.0.log")
+# a worktree left by an earlier run is moved to the commit under test: kept as it was, a second
+# run built the first run's commit and reported it under the one asked for
+if [ -d "$C/wt-0.8.0" ]; then
+  git -C "$C/wt-0.8.0" checkout -q --detach "$UNDER_TEST" || exit 1
+else
+  git worktree add -q --detach "$C/wt-0.8.0" "$UNDER_TEST" || exit 1
+fi
+echo "under test: $UNDER_TEST" | tee "$C/build-0.8.0.log"
+(cd "$C/wt-0.8.0" && ./gradlew clean build installDist --no-watch-fs >> "$C/build-0.8.0.log" 2>&1)
+built=$?
+echo "build 0.8.0 exit=$built" | tee -a "$C/build-0.8.0.log"
 grep -E "^test:" "$C/build-0.8.0.log"
+# a failed build fails the run: the script used to end with grep's exit code, 0 whatever the build did
+[ $built -eq 0 ] || exit 1
