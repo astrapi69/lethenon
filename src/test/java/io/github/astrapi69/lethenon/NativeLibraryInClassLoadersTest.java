@@ -136,8 +136,8 @@ class NativeLibraryInClassLoadersTest
 	}
 
 	@Test
-	@DisplayName("today a lethenon on an interrupted thread waits the full five seconds for a claim nobody finishes, and one on a thread that is not waits them and writes (#241)")
-	void aStaleClaim_keepsAnInterruptedLethenonWaiting() throws Exception
+	@DisplayName("a lethenon on an interrupted thread goes on at once past a claim nobody finishes and keeps its interrupt, and one on a thread that is not waits the five seconds and writes (#241)")
+	void aStaleClaim_letsAnInterruptedLethenonGoOn() throws Exception
 	{
 		List<String> said = hosted(List.of("-D" + SqliteNativeLibrary.CLAIMED_PROPERTY
 			+ "=a lethenon that never finishes"), "stale-claim", "stale-claim");
@@ -146,8 +146,7 @@ class NativeLibraryInClassLoadersTest
 		assertWritten("stale-claim", said, "patient.lethenon");
 		assertTrue(said.contains("interrupt kept true"), () -> "the interrupt was kept: " + said);
 		long interrupted = millis(said, "interrupted waited ");
-		assertTrue(interrupted >= SqliteNativeLibrary.CLAIMANT_WAIT.toMillis() - 100,
-			() -> "the interrupted lethenon waited the full time: " + said);
+		assertTrue(interrupted < 1000, () -> "the interrupted lethenon went on at once: " + said);
 		long patient = millis(said, "patient waited ");
 		assertTrue(patient >= SqliteNativeLibrary.CLAIMANT_WAIT.toMillis() - 100,
 			() -> "the patient lethenon waited for the claim until the time ran out: " + said);

@@ -62,8 +62,10 @@ import org.sqlite.util.LibraryLoaderUtil;
  * sqlite-jdbc at the cache, and it claims that in one step ({@code lethenon.sqlite.lib.claimed}).
  * A lethenon in another class loader, a plugin loaded again or one starting at the same moment,
  * waits until the first is done ({@code lethenon.sqlite.lib.prepared}) and leaves its sqlite-jdbc
- * to extract a copy as before. A sqlite-jdbc that is not lethenon's and loads its library in the
- * milliseconds the properties are set still reads them.
+ * to extract a copy as before. The claim stays for the life of the JVM, so a lethenon loaded after
+ * the first one's class loader is gone extracts a copy of its own as well. A sqlite-jdbc that is
+ * not lethenon's and loads its library in the milliseconds the properties are set still reads
+ * them.
  * <p>
  * A host that set {@code org.sqlite.lib.path} itself keeps its choice, and a name it set in
  * {@code org.sqlite.lib.name} is put back after the load. Where the directory cannot be written,
@@ -101,8 +103,8 @@ final class SqliteNativeLibrary
 	}
 
 	/**
-	 * Puts the native library into the user's cache and has sqlite-jdbc load it from there, once
-	 * per JVM; before the first connection
+	 * Puts the native library into the user's cache and has sqlite-jdbc load it from there; once
+	 * per class loader, before its first connection, and only in the first lethenon of a JVM
 	 *
 	 * @throws SQLException
 	 *             if sqlite-jdbc, pointed at the cache, can load its native library neither from
@@ -200,12 +202,14 @@ final class SqliteNativeLibrary
 	/**
 	 * Waits, {@link #CLAIMANT_WAIT} at most, until the lethenon that claimed the library is done,
 	 * so that this one's sqlite-jdbc does not read the two properties while they point at a file
-	 * that is loaded in another class loader; past that it goes on, at the cost of one logged error
+	 * that is loaded in another class loader; past that it goes on, at the cost of one logged error.
+	 * An interrupted thread does not wait: it goes on at once and keeps its interrupt
 	 */
 	private static void awaitTheClaimant()
 	{
 		long giveUp = System.nanoTime() + CLAIMANT_WAIT.toNanos();
-		while (System.getProperty(PREPARED_PROPERTY) == null && System.nanoTime() - giveUp < 0)
+		while (System.getProperty(PREPARED_PROPERTY) == null && System.nanoTime() - giveUp < 0
+			&& !Thread.currentThread().isInterrupted())
 		{
 			LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(1));
 		}
