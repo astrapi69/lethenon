@@ -36,10 +36,13 @@ import java.net.Socket;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
@@ -62,6 +65,10 @@ class DiscoveryTest
 	private static final PeerAddress IN_HANDSHAKE = new PeerAddress("198.51.100.1", 18481);
 
 	private static final PeerAddress NEW = new PeerAddress("198.51.100.1", 18482);
+
+	private static final PeerAddress ANOTHER = new PeerAddress("198.51.100.1", 18483);
+
+	private static final PeerAddress A_THIRD = new PeerAddress("198.51.100.1", 18484);
 
 	@Test
 	@DisplayName("an address in its handshake is not dialled again, a new one is")
@@ -196,6 +203,160 @@ class DiscoveryTest
 		finally
 		{
 			threads.shutdownNow();
+		}
+	}
+
+	/**
+	 * Today a fill that runs while a dial holds its slot, the dial still counted as dialling as
+	 * well, sees the node full, and a dial that succeeds does not fill again, so the slot stays
+	 * empty while addresses are heard of (lethenon#278: newcomers stuck at eleven outgoing
+	 * connections with four addresses heard of). The order is forced: the first dial counts its
+	 * slot as Node.connect does, the fill of the PEERS answer returns, and a second fill runs while
+	 * the dial has not returned yet, as the PEERS answer of another connection would
+	 */
+	@Test
+	@DisplayName("today a fill while a dial holds its slot leaves that slot empty, with addresses heard of")
+	void aFillWhileADialHoldsItsSlot_leavesTheSlotEmpty() throws Exception
+	{
+		AtomicInteger outgoing = new AtomicInteger(Node.MAXIMUM_OUTGOING - 2);
+		List<PeerAddress> dialled = new CopyOnWriteArrayList<>();
+		CountDownLatch slotCounted = new CountDownLatch(1);
+		CountDownLatch learnReturned = new CountDownLatch(1);
+		Discovery[] discovery = new Discovery[1];
+		Discovery.Dialer dialer = new Discovery.Dialer()
+		{
+			@Override
+			public int outgoing()
+			{
+				return outgoing.get();
+			}
+
+			@Override
+			public int maximum()
+			{
+				return Node.MAXIMUM_OUTGOING;
+			}
+
+			/** As Node.connect does: the slot is counted first, the socket opened after */
+			@Override
+			public void dial(final PeerAddress address)
+			{
+				outgoing.incrementAndGet();
+				dialled.add(address);
+				if (dialled.size() == 1)
+				{
+					slotCounted.countDown();
+					awaitLatch(learnReturned);
+					discovery[0].fill();
+				}
+			}
+
+			@Override
+			public Set<PeerAddress> handshaking()
+			{
+				return new HashSet<>(dialled);
+			}
+		};
+		FirstDialHoldsTheFill threads = new FirstDialHoldsTheFill(slotCounted);
+		try (ServerSocket server = new ServerSocket(0);
+			Socket ours = new Socket("127.0.0.1", server.getLocalPort());
+			Socket theirs = server.accept())
+		{
+			discovery[0] = new Discovery(List.of(), new Refusals(), dialer, threads);
+			Peer peer = peerOver(ours);
+			peer.expectPeers();
+
+			discovery[0].learn(peer, new PeerList(List.of(NEW, ANOTHER, A_THIRD)));
+			learnReturned.countDown();
+			threads.awaitFinished();
+
+			assertEquals(Node.MAXIMUM_OUTGOING - 1, outgoing.get(),
+				() -> "outgoing connections, with " + dialled + " dialled");
+			assertEquals(1, dialled.size(), () -> "dialled " + dialled);
+		}
+	}
+
+	private static void awaitLatch(final CountDownLatch latch)
+	{
+		try
+		{
+			if (!latch.await(10, TimeUnit.SECONDS))
+			{
+				throw new AssertionError("the latch was not counted down in 10 s");
+			}
+		}
+		catch (InterruptedException interrupted)
+		{
+			Thread.currentThread().interrupt();
+			throw new AssertionError(interrupted);
+		}
+	}
+
+	/**
+	 * Runs each dial on a virtual thread of its own, and lets the fill that submitted the first one
+	 * go on only once that dial has counted its slot, as when the filling thread is held up right
+	 * after the submit
+	 */
+	private static final class FirstDialHoldsTheFill extends AbstractExecutorService
+	{
+
+		private final CountDownLatch slotCounted;
+
+		private final List<Thread> started = new CopyOnWriteArrayList<>();
+
+		FirstDialHoldsTheFill(final CountDownLatch slotCounted)
+		{
+			this.slotCounted = slotCounted;
+		}
+
+		@Override
+		public void execute(final Runnable task)
+		{
+			started.add(Thread.ofVirtual().start(task));
+			if (started.size() == 1)
+			{
+				awaitLatch(slotCounted);
+			}
+		}
+
+		/** Waits for every dial, those a dial started included */
+		void awaitFinished() throws InterruptedException
+		{
+			for (int index = 0; index < started.size(); index++)
+			{
+				started.get(index).join(TimeUnit.SECONDS.toMillis(10));
+			}
+		}
+
+		@Override
+		public void shutdown()
+		{
+		}
+
+		@Override
+		public List<Runnable> shutdownNow()
+		{
+			return List.of();
+		}
+
+		@Override
+		public boolean isShutdown()
+		{
+			return false;
+		}
+
+		@Override
+		public boolean isTerminated()
+		{
+			return started.stream().noneMatch(Thread::isAlive);
+		}
+
+		@Override
+		public boolean awaitTermination(final long timeout, final TimeUnit unit)
+			throws InterruptedException
+		{
+			awaitFinished();
+			return isTerminated();
 		}
 	}
 
