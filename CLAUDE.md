@@ -4,6 +4,13 @@ A protest chain against the politics of surveillance: a joke currency whose poin
 demonstration. Java 25, Gradle, JUnit 6. The library goes to Maven Central (#30), the chain does not:
 no pool, no listing, nothing tradeable.
 
+## Family rules
+
+The rules every agent session in this family follows are public at
+<https://github.com/astrapi69/astrapi69/tree/main/rules>. Read them before any work: the entry point
+`rules/index.md` and the core under `rules/core/`, which `index.md` loads into every session. The
+rules in this repository add only what is specific to it.
+
 ## The first rule
 
 **Use this family's libraries - crypt-api, crypt-data, mystic-crypt, checksum-up, gen-tree - and
