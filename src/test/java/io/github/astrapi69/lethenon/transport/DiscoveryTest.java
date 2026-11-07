@@ -207,16 +207,16 @@ class DiscoveryTest
 	}
 
 	/**
-	 * Today a fill that runs while a dial holds its slot, the dial still counted as dialling as
-	 * well, sees the node full, and a dial that succeeds does not fill again, so the slot stays
-	 * empty while addresses are heard of (lethenon#278: newcomers stuck at eleven outgoing
-	 * connections with four addresses heard of). The order is forced: the first dial counts its
-	 * slot as Node.connect does, the fill of the PEERS answer returns, and a second fill runs while
-	 * the dial has not returned yet, as the PEERS answer of another connection would
+	 * A fill that runs while a dial holds its slot, the dial still counted as dialling as well,
+	 * sees the node full; the fill at the end of that dial sees the true count and takes the slot
+	 * (#278: newcomers stuck at eleven outgoing connections with four addresses heard of). The
+	 * order is forced: the first dial counts its slot as Node.connect does, the fill of the PEERS
+	 * answer returns, and a second fill runs while the dial has not returned yet, as the PEERS
+	 * answer of another connection would
 	 */
 	@Test
-	@DisplayName("today a fill while a dial holds its slot leaves that slot empty, with addresses heard of")
-	void aFillWhileADialHoldsItsSlot_leavesTheSlotEmpty() throws Exception
+	@DisplayName("a fill while a dial holds its slot stops early, and the dial fills the slot once it returns")
+	void aFillWhileADialHoldsItsSlot_isFollowedByOneThatTakesTheSlot() throws Exception
 	{
 		AtomicInteger outgoing = new AtomicInteger(Node.MAXIMUM_OUTGOING - 2);
 		List<PeerAddress> dialled = new CopyOnWriteArrayList<>();
@@ -270,9 +270,9 @@ class DiscoveryTest
 			learnReturned.countDown();
 			threads.awaitFinished();
 
-			assertEquals(Node.MAXIMUM_OUTGOING - 1, outgoing.get(),
+			assertEquals(Node.MAXIMUM_OUTGOING, outgoing.get(),
 				() -> "outgoing connections, with " + dialled + " dialled");
-			assertEquals(1, dialled.size(), () -> "dialled " + dialled);
+			assertEquals(2, dialled.size(), () -> "dialled " + dialled);
 		}
 	}
 
