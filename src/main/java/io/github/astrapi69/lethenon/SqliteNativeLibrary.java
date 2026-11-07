@@ -30,6 +30,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.sql.SQLException;
 import java.util.Arrays;
 
 import org.sqlite.JDBC;
@@ -50,6 +51,13 @@ import org.sqlite.util.LibraryLoaderUtil;
  * with the same bytes is kept as it is; a new one is written under a temporary name and moved
  * into place, so two processes starting at once do not race.
  * <p>
+ * The two properties are set only while sqlite-jdbc loads the library, and taken back then. Every
+ * sqlite-jdbc in the JVM reads them, and the JDK loads a native library into one class loader
+ * only: a sqlite-jdbc in another class loader, a host's own for example, would fail on the file,
+ * log that as an error and extract a copy of its own all the same. A lethenon in another class
+ * loader of the same JVM, a plugin loaded again for example, finds the mark
+ * {@code lethenon.sqlite.lib.loaded} and leaves its sqlite-jdbc to extract a copy as before.
+ * <p>
  * A host that set {@code org.sqlite.lib.path} itself keeps its choice. Where the directory cannot
  * be written, nothing is set and sqlite-jdbc extracts as before.
  */
@@ -62,6 +70,12 @@ final class SqliteNativeLibrary
 	/** The property sqlite-jdbc reads the file name of its native library from */
 	static final String NAME_PROPERTY = "org.sqlite.lib.name";
 
+	/**
+	 * The mark, JVM-wide, that the sqlite-jdbc of a lethenon loaded the native library pointed at
+	 * the cache; it holds the cache's directory
+	 */
+	static final String LOADED_PROPERTY = "lethenon.sqlite.lib.loaded";
+
 	private static boolean prepared;
 
 	private SqliteNativeLibrary()
@@ -69,17 +83,21 @@ final class SqliteNativeLibrary
 	}
 
 	/**
-	 * Puts the native library into the user's cache and points sqlite-jdbc at it, once per JVM;
-	 * before the first connection
+	 * Puts the native library into the user's cache and has sqlite-jdbc load it from there, once
+	 * per JVM and class loader; before the first connection
+	 *
+	 * @throws SQLException
+	 *             if sqlite-jdbc can load its native library neither from the cache nor from
+	 *             anywhere else it looks
 	 */
-	static synchronized void prepare()
+	static synchronized void prepare() throws SQLException
 	{
 		if (prepared)
 		{
 			return;
 		}
 		prepared = true;
-		if (System.getProperty(PATH_PROPERTY) != null)
+		if (System.getProperty(PATH_PROPERTY) != null || System.getProperty(LOADED_PROPERTY) != null)
 		{
 			return;
 		}
@@ -95,14 +113,41 @@ final class SqliteNativeLibrary
 				return;
 			}
 			placed(library.readAllBytes(), directory.resolve(name));
-			System.setProperty(PATH_PROPERTY, directory.toString());
-			System.setProperty(NAME_PROPERTY, name);
 		}
 		catch (IOException | UncheckedIOException | SecurityException notWritable)
 		{
 			// the cache cannot hold the library: sqlite-jdbc extracts it as it always did, which
 			// costs one copy per killed process and nothing else
 			return;
+		}
+		loadedFrom(directory, name);
+	}
+
+	/**
+	 * Has sqlite-jdbc load the library from the directory, with the two properties set only while
+	 * it does, and marks the JVM afterwards
+	 */
+	private static void loadedFrom(final Path directory, final String name) throws SQLException
+	{
+		System.setProperty(PATH_PROPERTY, directory.toString());
+		System.setProperty(NAME_PROPERTY, name);
+		try
+		{
+			if (SQLiteJDBCLoader.initialize())
+			{
+				System.setProperty(LOADED_PROPERTY, directory.toString());
+			}
+		}
+		catch (Exception notLoaded)
+		{
+			// SQLiteJDBCLoader.initialize declares Exception; what it throws names the paths tried
+			throw new SQLException("sqlite-jdbc could not load its native library, " + directory
+				+ " tried first: " + notLoaded.getMessage(), notLoaded);
+		}
+		finally
+		{
+			System.clearProperty(PATH_PROPERTY);
+			System.clearProperty(NAME_PROPERTY);
 		}
 	}
 

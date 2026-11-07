@@ -25,7 +25,6 @@
 package io.github.astrapi69.lethenon;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -57,7 +56,8 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * A host that loads lethenon in a class loader of its own, as mystic-crypt-ui's plugin manager
  * does (#223): lethenon and sqlite-jdbc are visible to that loader, not to the application's
- * class loader the JDBC driver registry was set up from
+ * class loader the JDBC driver registry was set up from. Such a host may load lethenon again, or
+ * bring a sqlite-jdbc of its own, in the JVM whose native library lethenon prepared (#241)
  */
 class ChainFileOwnClassLoaderTest
 {
@@ -82,8 +82,8 @@ class ChainFileOwnClassLoaderTest
 	}
 
 	@Test
-	@DisplayName("today a lethenon loaded again, in a class loader of its own, logs that its sqlite-jdbc cannot load the native library, and writes all the same")
-	void aLethenonLoadedAgain_logsThatItCannotLoadTheNativeLibrary(@TempDir final Path directory)
+	@DisplayName("a lethenon loaded again, in a class loader of its own, writes, and its sqlite-jdbc logs no failure to load the native library (#241)")
+	void aLethenonLoadedAgain_loadsTheNativeLibraryWithoutAnError(@TempDir final Path directory)
 		throws Exception
 	{
 		Path first = directory.resolve("first.lethenon");
@@ -101,14 +101,14 @@ class ChainFileOwnClassLoaderTest
 			});
 		}
 
-		assertFalse(failures.isEmpty(), "sqlite-jdbc logged no failure to load its library");
+		assertEquals(List.of(), failures, "sqlite-jdbc logged a failure to load its library");
 		assertEquals(List.of(), new ChainFile(again).readPending(),
 			"the lethenon loaded again wrote its chain");
 	}
 
 	@Test
-	@DisplayName("today another program's sqlite-jdbc, in a class loader of its own, logs after lethenon that it cannot load the native library, and connects all the same")
-	void anotherSqliteJdbc_afterLethenon_logsThatItCannotLoadTheNativeLibrary(
+	@DisplayName("another program's sqlite-jdbc, in a class loader of its own, connects after lethenon, and logs no failure to load the native library (#241)")
+	void anotherSqliteJdbc_afterLethenon_loadsTheNativeLibraryWithoutAnError(
 		@TempDir final Path directory) throws Exception
 	{
 		URL sqliteJdbc = JDBC.class.getProtectionDomain().getCodeSource().getLocation();
@@ -126,7 +126,7 @@ class ChainFileOwnClassLoaderTest
 			});
 		}
 
-		assertFalse(failures.isEmpty(), "sqlite-jdbc logged no failure to load its library");
+		assertEquals(List.of(), failures, "sqlite-jdbc logged a failure to load its library");
 		assertEquals(1, answer.get(), "the other program's connection answered");
 	}
 
