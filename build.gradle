@@ -88,6 +88,22 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+/**
+ * A Javadoc warning fails the build, and the Javadoc is English whatever the machine's locale: the
+ * family standard of 2026-11-05. -locale sets only the lang attribute; the doclet's own words come
+ * from the locale of the javadoc JVM, so both are set. check runs it, so ./gradlew build fails on a
+ * missing comment instead of a gate counting warnings by their text.
+ */
+tasks.named('javadoc', Javadoc) {
+    failOnError = true
+    options.addBooleanOption('Werror', true)
+    options.locale = 'en'
+    options.jFlags('-Duser.language=en', '-Duser.country=US')
+}
+tasks.named('check') {
+    dependsOn tasks.named('javadoc')
+}
+
 test {
     useJUnitPlatform()
     jvmArgs '--enable-native-access=ALL-UNNAMED'

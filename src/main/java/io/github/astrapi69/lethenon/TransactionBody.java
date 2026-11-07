@@ -70,6 +70,12 @@ public record TransactionBody(String chainIdentifier, long nonce, Bytes sender, 
 		return AmountScheme.PLAIN;
 	}
 
+	/**
+	 * A transfer's parts, checked before the transfer exists
+	 *
+	 * @throws IllegalArgumentException
+	 *             for a negative nonce or a memo longer than {@value #MEMO_LIMIT} characters
+	 */
 	public TransactionBody
 	{
 		if (nonce < 0L)

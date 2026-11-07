@@ -60,6 +60,13 @@ public record BlockBody(String chainIdentifier, long height, Bytes previousHash,
 	/** How long a pun may be, for the same reason a memo is bounded */
 	public static final int PUN_LIMIT = 280;
 
+	/**
+	 * A block's parts, checked before the block exists
+	 *
+	 * @throws IllegalArgumentException
+	 *             for a negative height or difficulty, a block that names no account it pays, or a
+	 *             pun longer than {@value #PUN_LIMIT} characters
+	 */
 	public BlockBody
 	{
 		if (height < 0L)
