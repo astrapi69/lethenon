@@ -28,6 +28,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 import io.github.astrapi69.lethenon.BlockBody;
 import io.github.astrapi69.lethenon.Blocks;
@@ -106,13 +107,32 @@ final class Networks
 	 */
 	static void await(final String what, final BooleanSupplier condition, final Duration limit)
 	{
+		await(() -> what, condition, limit);
+	}
+
+	/**
+	 * Waits until the condition holds, at most ten seconds, and says what was waited for only when
+	 * the time runs out: the description reads the state at that moment, so a failure shows what
+	 * stood in the way (#278)
+	 *
+	 * @throws AssertionError
+	 *             with the description as it reads when the deadline passes
+	 */
+	static void await(final Supplier<String> what, final BooleanSupplier condition)
+	{
+		await(what, condition, Duration.ofSeconds(10));
+	}
+
+	private static void await(final Supplier<String> what, final BooleanSupplier condition,
+		final Duration limit)
+	{
 		long wallStart = System.currentTimeMillis();
 		long deadline = System.nanoTime() + limit.toNanos();
 		while (!condition.getAsBoolean())
 		{
 			if (System.nanoTime() > deadline)
 			{
-				throw new AssertionError("waited " + readable(limit) + " for " + what
+				throw new AssertionError("waited " + readable(limit) + " for " + what.get()
 					+ "; the wall clock moved " + (System.currentTimeMillis() - wallStart)
 					+ " ms meanwhile\n" + threads());
 			}
@@ -124,7 +144,7 @@ final class Networks
 			catch (InterruptedException interrupted)
 			{
 				Thread.currentThread().interrupt();
-				throw new AssertionError("interrupted while waiting for " + what);
+				throw new AssertionError("interrupted while waiting for " + what.get());
 			}
 		}
 	}
