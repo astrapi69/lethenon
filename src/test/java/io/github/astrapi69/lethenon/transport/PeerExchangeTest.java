@@ -157,7 +157,9 @@ class PeerExchangeTest
 
 			await("the newcomer's outgoing connections full",
 				() -> newcomer.peers().size() == Node.MAXIMUM_OUTGOING);
-			assertFalse(newcomer.heardOf().isEmpty(), "the rest stays heard of");
+			assertFalse(newcomer.heardOf().isEmpty(),
+				() -> "the rest stays heard of; " + newcomer.peers().size() + " peers, heard of "
+					+ newcomer.heardOf() + ", refusals " + newcomer.refusals());
 		}
 		finally
 		{
