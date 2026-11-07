@@ -38,9 +38,13 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import io.github.astrapi69.lethenon.BlockBody;
 import io.github.astrapi69.lethenon.Bytes;
@@ -197,6 +201,54 @@ class AnonymousInboundTest
 				socket.close();
 			}
 		}
+	}
+
+	/**
+	 * A node that does not discover peers stays with its zone peers as well: it hears of the onion
+	 * addresses they pass on and dials none of them, whichever of the two it is told first. Up to
+	 * 2026-11 the flag reached the clearnet only
+	 */
+	@ParameterizedTest(name = "discovery switched off {argumentSetName}")
+	@MethodSource("bothOrders")
+	void aNodeThatDoesNotDiscover_dialsNoLearntOnionAddress(final boolean beforeTheZone)
+		throws Exception
+	{
+		try (Socks5Server socks = Socks5Server.start(); Socks5Server routeOfC = Socks5Server.start();
+			Node a = onionNode(socks, ONION_A, routeOfC);
+			Node b = onionNode(socks, ONION_B, routeOfC);
+			Node c = notDiscovering(routeOfC, beforeTheZone))
+		{
+			a.connectAll(List.of(ONION_B));
+			await("a at b", () -> b.anonymousPeers().size() == 1);
+
+			c.connectAll(List.of(ONION_B));
+
+			await("c heard of a from b, or dialled it",
+				() -> c.anonymousHeardOf().contains(ONION_A) || c.anonymousPeers().size() > 1);
+			// a dial would start on a thread of its own after the address is heard of; through the
+			// local SOCKS stub it opens within milliseconds, so a second is room enough to see one
+			Thread.sleep(1_000L);
+			assertEquals(1, c.anonymousPeers().size(), "c: " + c.refusals());
+			assertEquals(List.of(ONION_B.host()),
+				routeOfC.requests().stream().map(Socks5Server.Request::host).toList(),
+				"c opened a connection to b alone");
+		}
+	}
+
+	static Stream<Arguments> bothOrders()
+	{
+		return Stream.of(Arguments.argumentSet("before the zone, as the command line does", true),
+			Arguments.argumentSet("after the zone", false));
+	}
+
+	private Node notDiscovering(final Socks5Server route, final boolean beforeTheZone)
+	{
+		Node node = Node.on(genesis);
+		if (beforeTheZone)
+		{
+			return node.discoverPeers(false).anonymityZone(Outbound.through(route.address()), 10);
+		}
+		return node.anonymityZone(Outbound.through(route.address()), 10).discoverPeers(false);
 	}
 
 	@Test
