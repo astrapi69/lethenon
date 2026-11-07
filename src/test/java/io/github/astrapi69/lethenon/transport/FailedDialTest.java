@@ -25,10 +25,12 @@
 package io.github.astrapi69.lethenon.transport;
 
 import static io.github.astrapi69.lethenon.transport.Networks.await;
+import static io.github.astrapi69.lethenon.transport.Networks.connectedInTurn;
 import static io.github.astrapi69.lethenon.transport.Networks.testGenesis;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -55,27 +57,6 @@ class FailedDialTest
 
 	private final List<BlockBody> genesis = testGenesis(holder.spendKey(SignatureSuite.ED25519));
 
-	/**
-	 * Starts listening nodes and connects them to the hub one after the other, each once the hub
-	 * holds the one before it
-	 */
-	private List<Node> connectedInTurn(final Node hub, final int hubPort, final int count)
-		throws java.io.IOException
-	{
-		List<Node> others = new ArrayList<>();
-		for (int index = 0; index < count; index++)
-		{
-			Node other = Node.on(genesis).discoverPeers(false);
-			others.add(other);
-			int listening = other.listen(0);
-			other.connect("127.0.0.1", hubPort);
-			int expected = index + 1;
-			await(() -> "node " + expected + " at the hub, listening on " + listening,
-				() -> hub.peers().size() == expected);
-		}
-		return others;
-	}
-
 	private static long notConnected(final Node node)
 	{
 		return node.refusals().stream().filter(refusal -> refusal.contains(NOT_CONNECTED)).count();
@@ -83,14 +64,14 @@ class FailedDialTest
 
 	@Test
 	@DisplayName("a learnt address whose dial is refused is forgotten, and the refusal says so (ADR 0003)")
-	void aLearntAddressWhoseDialIsRefused_isForgotten() throws java.io.IOException
+	void aLearntAddressWhoseDialIsRefused_isForgotten() throws IOException
 	{
 		List<Node> others = new ArrayList<>();
 		try (Node hub = Node.on(genesis).discoverPeers(false).keepingLocalAddresses();
 			Node newcomer = Node.on(genesis).keepingLocalAddresses())
 		{
 			int hubPort = hub.listen(0);
-			others.addAll(connectedInTurn(hub, hubPort, 2));
+			others.addAll(connectedInTurn(genesis, hub, hubPort, 2));
 			others.get(0).close();
 			await("the closed node gone from the hub", () -> hub.peers().size() == 1);
 
@@ -111,14 +92,14 @@ class FailedDialTest
 
 	@Test
 	@DisplayName("with three of fourteen learnt addresses refused, the newcomer holds twelve and has heard of none (#278)")
-	void threeRefusedOfFourteen_leaveTwelveAndNothingHeardOf() throws java.io.IOException
+	void threeRefusedOfFourteen_leaveTwelveAndNothingHeardOf() throws IOException
 	{
 		List<Node> others = new ArrayList<>();
 		try (Node hub = Node.on(genesis).discoverPeers(false).keepingLocalAddresses();
 			Node newcomer = Node.on(genesis).keepingLocalAddresses())
 		{
 			int hubPort = hub.listen(0);
-			others.addAll(connectedInTurn(hub, hubPort, Node.MAXIMUM_OUTGOING + 2));
+			others.addAll(connectedInTurn(genesis, hub, hubPort, Node.MAXIMUM_OUTGOING + 2));
 			for (int index = 0; index < 3; index++)
 			{
 				others.get(index).close();
