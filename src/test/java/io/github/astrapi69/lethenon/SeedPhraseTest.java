@@ -26,6 +26,7 @@ package io.github.astrapi69.lethenon;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -223,11 +224,40 @@ class SeedPhraseTest
 	@CsvSource(delimiter = '|', value = { "the first word of the list|abandon|true",
 			"the last word of the list|zoo|true", "a word in capitals|Abandon|true",
 			"a word with spaces around it|'  zoo '|true", "a word that is not in the list|lethenon|false",
-			"one letter short of a word|abando|false", "an empty word|''|false" })
+			"one letter short of a word|abando|false", "an empty word|''|false",
+			"two words of the list|abandon zoo|false", "a number alone|1.|false" })
 	void aWordIsKnownOnlyWhenItIsInTheList(final String name, final String word,
 		final boolean known)
 	{
 		assertEquals(known, SeedPhrase.isKnownWord(word));
+	}
+
+	/**
+	 * Today a word entered with what {@link SeedPhrase#parse} drops around it - a non-breaking
+	 * space, a number in front, a comma - is not a known word, although parse reads it as that one
+	 * word and the Javadoc of isKnownWord reads a word as parse reads it
+	 */
+	@ParameterizedTest(name = "{argumentSetName}")
+	@MethodSource("enteredWords")
+	void aWordAsParseReadsIt_isNotKnown(final String entered, final String word)
+	{
+		assertEquals(List.of(word), SeedPhrase.parse(entered));
+		assertFalse(SeedPhrase.isKnownWord(entered));
+	}
+
+	/** One word as a program that asks for the words one at a time may get it, pasted */
+	static Stream<Arguments> enteredWords()
+	{
+		return Stream.of(
+			Arguments.argumentSet("a non-breaking space in front (U+00A0)", " abandon",
+				"abandon"),
+			Arguments.argumentSet("a figure space behind (U+2007)", "zoo ", "zoo"),
+			Arguments.argumentSet("narrow no-break spaces around (U+202F)", " abandon ",
+				"abandon"),
+			Arguments.argumentSet("numbered 1. without a space", "1.abandon", "abandon"),
+			Arguments.argumentSet("numbered 1. with a space", "1. zoo", "zoo"),
+			Arguments.argumentSet("numbered 01", "01 abandon", "abandon"),
+			Arguments.argumentSet("a comma behind", "zoo,", "zoo"));
 	}
 
 	@Test
