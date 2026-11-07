@@ -26,7 +26,6 @@ package io.github.astrapi69.lethenon;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -89,8 +88,8 @@ class NativeLibraryInClassLoadersTest
 	}
 
 	@Test
-	@DisplayName("today two lethenons that open their first chain at the same moment, each in a class loader of its own, make sqlite-jdbc log a failure to load the native library (#241)")
-	void twoLethenonsTogether_logAFailureToLoadTheLibrary() throws Exception
+	@DisplayName("two lethenons that open their first chain at the same moment, each in a class loader of its own, write, and sqlite-jdbc logs no failure to load the native library (#241)")
+	void twoLethenonsTogether_loadTheLibraryWithoutAFailure() throws Exception
 	{
 		// the cache holds the library already, as on every start after the first
 		hosted(List.of(), "again", "warm");
@@ -105,20 +104,20 @@ class NativeLibraryInClassLoadersTest
 			}
 		}
 
-		assertFalse(withFailures.isEmpty(),
-			"no run logged a failure, of " + TOGETHER_RUNS + " with two lethenons at one moment");
+		assertEquals(List.of(), withFailures, "the runs that logged a failure, of " + TOGETHER_RUNS
+			+ " with two lethenons at one moment");
 		assertEquals(1, librariesInTheCache(), "one copy in the cache");
 	}
 
 	@Test
-	@DisplayName("today a library name the host set in org.sqlite.lib.name is gone after lethenon's first connection (#241)")
-	void aLibraryNameOfTheHost_isGoneAfterLethenonsFirstConnection() throws Exception
+	@DisplayName("a library name the host set in org.sqlite.lib.name is back after lethenon's first connection (#241)")
+	void aLibraryNameOfTheHost_isBackAfterLethenonsFirstConnection() throws Exception
 	{
 		List<String> said = hosted(List.of("-Dorg.sqlite.lib.name=" + HOST_NAME), "host-name",
 			"host-name");
 
 		assertWritten("host-name", said, "host.lethenon");
-		assertTrue(said.contains("lib.name null"), () -> "the host's name is gone: " + said);
+		assertTrue(said.contains("lib.name " + HOST_NAME), () -> "the host's name is back: " + said);
 	}
 
 	/**
