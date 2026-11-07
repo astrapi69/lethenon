@@ -38,9 +38,13 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import io.github.astrapi69.lethenon.BlockBody;
 import io.github.astrapi69.lethenon.Bytes;
@@ -197,6 +201,46 @@ class AnonymousInboundTest
 				socket.close();
 			}
 		}
+	}
+
+	/**
+	 * Today a node that does not discover peers still dials the onion addresses its zone peers pass
+	 * on, whichever of the two it is told first: the flag reaches the clearnet only
+	 */
+	@ParameterizedTest(name = "discovery switched off {argumentSetName}")
+	@MethodSource("bothOrders")
+	void aNodeThatDoesNotDiscover_stillDialsLearntOnionAddresses(final boolean beforeTheZone)
+		throws IOException
+	{
+		try (Socks5Server socks = Socks5Server.start(); Socks5Server routeOfC = Socks5Server.start();
+			Node a = onionNode(socks, ONION_A, routeOfC);
+			Node b = onionNode(socks, ONION_B, routeOfC);
+			Node c = notDiscovering(routeOfC, beforeTheZone))
+		{
+			a.connectAll(List.of(ONION_B));
+			await("a at b", () -> b.anonymousPeers().size() == 1);
+
+			c.connectAll(List.of(ONION_B));
+
+			await("c dialled a, learnt from b", () -> c.anonymousPeers().size() == 2);
+			assertEquals(2, routeOfC.requests().size(), routeOfC.requests().toString());
+		}
+	}
+
+	static Stream<Arguments> bothOrders()
+	{
+		return Stream.of(Arguments.argumentSet("before the zone, as the command line does", true),
+			Arguments.argumentSet("after the zone", false));
+	}
+
+	private Node notDiscovering(final Socks5Server route, final boolean beforeTheZone)
+	{
+		Node node = Node.on(genesis);
+		if (beforeTheZone)
+		{
+			return node.discoverPeers(false).anonymityZone(Outbound.through(route.address()), 10);
+		}
+		return node.anonymityZone(Outbound.through(route.address()), 10).discoverPeers(false);
 	}
 
 	@Test
