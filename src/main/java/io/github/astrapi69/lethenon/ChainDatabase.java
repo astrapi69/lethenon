@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -37,6 +36,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+
+import org.sqlite.JDBC;
 
 /**
  * One SQLite database holding a chain and the transfers waiting for its next block (#202, ADR
@@ -246,8 +248,11 @@ final class ChainDatabase
 
 	private static Connection open(final Path database) throws SQLException
 	{
-		Connection connection = DriverManager
-			.getConnection("jdbc:sqlite:" + database.toAbsolutePath());
+		// through sqlite-jdbc's own driver, not the registry: DriverManager hands out only drivers
+		// its caller's class loader can see, and a host that loads lethenon in a loader of its own
+		// set the registry up from another one (#223)
+		Connection connection = JDBC.createConnection("jdbc:sqlite:" + database.toAbsolutePath(),
+			new Properties());
 		try (Statement pragma = connection.createStatement())
 		{
 			pragma.execute("PRAGMA busy_timeout = " + BUSY_TIMEOUT_MILLIS);
