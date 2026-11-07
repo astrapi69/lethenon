@@ -61,11 +61,20 @@ class AnonymousInboundTest
 
 	private final List<BlockBody> genesis = testGenesis(Bytes.of(new byte[] { 1 }));
 
-	private Node onionNode(final Socks5Server socks, final PeerAddress onion) throws IOException
+	/**
+	 * A node with an onion service, reached through the given SOCKS server and through every other
+	 * one given
+	 */
+	private Node onionNode(final Socks5Server socks, final PeerAddress onion,
+		final Socks5Server... alsoRoutedBy) throws IOException
 	{
 		Node node = Node.on(genesis).anonymityZone(Outbound.through(socks.address()), 10);
 		int port = node.listenAnonymously(onion, 0, 16);
 		socks.route(onion.host(), onion.port(), port);
+		for (Socks5Server other : alsoRoutedBy)
+		{
+			other.route(onion.host(), onion.port(), port);
+		}
 		return node;
 	}
 
@@ -122,6 +131,13 @@ class AnonymousInboundTest
 		}
 	}
 
+	/**
+	 * The silent address is a real onion node for b and a, and a mute listener for c alone: b
+	 * keeps it confirmed and passes it on for as long as the test runs. Up to 2026-11 b learnt it
+	 * from a handshake that left at once, dialled it itself, and forgot it when its own handshake
+	 * timed out: a c that asked b more than {@link Node#HANDSHAKE_MILLIS} later never heard of it,
+	 * filled its slot with a, and the test failed with no refusal (run 41783361755)
+	 */
 	@Test
 	@DisplayName("a learnt onion address that never says HELLO gives its zone slot back")
 	void aSilentOnionAddress_givesItsZoneSlotBack() throws Exception
@@ -129,7 +145,9 @@ class AnonymousInboundTest
 		PeerAddress silentOnion = PeerAddress.parse(
 			"ssssssssssssssssssssssssssssssssssssssssssssssssssssssss.onion:18484");
 		List<Socket> held = new java.util.concurrent.CopyOnWriteArrayList<>();
-		try (Socks5Server socks = Socks5Server.start(); Node b = onionNode(socks, ONION_B);
+		try (Socks5Server socks = Socks5Server.start(); Socks5Server routeOfC = Socks5Server.start();
+			Node b = onionNode(socks, ONION_B, routeOfC);
+			Node speaking = onionNode(socks, silentOnion);
 			java.net.ServerSocket silent = new java.net.ServerSocket(0))
 		{
 			Thread.ofVirtual().start(() -> {
@@ -145,18 +163,19 @@ class AnonymousInboundTest
 					}
 				}
 			});
-			socks.route(silentOnion.host(), silentOnion.port(), silent.getLocalPort());
-			announceThroughTheOnionService(socks, ONION_B, silentOnion);
-			try (Node a = onionNode(socks, ONION_A);
-				Node c = Node.on(genesis).anonymityZone(Outbound.through(socks.address()), 2))
+			routeOfC.route(silentOnion.host(), silentOnion.port(), silent.getLocalPort());
+			speaking.connectAll(List.of(ONION_B));
+			await("the silent address confirmed at b", () -> b.anonymousPeers().size() == 1);
+			try (Node a = onionNode(socks, ONION_A, routeOfC);
+				Node c = Node.on(genesis).anonymityZone(Outbound.through(routeOfC.address()), 2))
 			{
 				a.connectAll(List.of(ONION_B));
 				await("a at b",
-					() -> b.anonymousPeers().size() >= 1 && a.anonymousPeers().size() == 1);
+					() -> b.anonymousPeers().size() >= 2 && a.anonymousPeers().size() >= 1);
 
 				c.connectAll(List.of(ONION_B));
 
-				await("the silent onion address dialled", () -> !held.isEmpty());
+				await("c dialled the silent onion address", () -> !held.isEmpty());
 				long deadline = System.currentTimeMillis() + 2L * Node.HANDSHAKE_MILLIS + 5_000L;
 				while (c.anonymousPeers().size() < 2 && System.currentTimeMillis() < deadline)
 				{
@@ -177,27 +196,6 @@ class AnonymousInboundTest
 			{
 				socket.close();
 			}
-		}
-	}
-
-	/**
-	 * Shakes hands with an onion node through its onion service as a zone peer that announces the
-	 * given onion address, so that the node confirms and passes on that address, then leaves
-	 */
-	private void announceThroughTheOnionService(final Socks5Server socks, final PeerAddress node,
-		final PeerAddress announced) throws IOException
-	{
-		try (Socket socket = Outbound.through(socks.address()).open(node, 10_000))
-		{
-			socket.setSoTimeout(10_000);
-			DataInputStream in = new DataInputStream(socket.getInputStream());
-			Hello plain = Hello.of(List.of(genesis.getFirst()), 0, 4242L);
-			Frames.write(new DataOutputStream(socket.getOutputStream()),
-				new Frame(MessageType.HELLO, new Hello(plain.protocolVersion(),
-					plain.chainIdentifier(), plain.genesisHash(), plain.bestHeight(),
-					plain.bestHash(), plain.work(), announced.port(), 4242L, announced.host())
-					.encode()));
-			Frames.read(in, Frames.MAXIMUM_FRAME);
 		}
 	}
 
