@@ -204,13 +204,14 @@ class AnonymousInboundTest
 	}
 
 	/**
-	 * Today a node that does not discover peers still dials the onion addresses its zone peers pass
-	 * on, whichever of the two it is told first: the flag reaches the clearnet only
+	 * A node that does not discover peers stays with its zone peers as well: it hears of the onion
+	 * addresses they pass on and dials none of them, whichever of the two it is told first. Up to
+	 * 2026-11 the flag reached the clearnet only
 	 */
 	@ParameterizedTest(name = "discovery switched off {argumentSetName}")
 	@MethodSource("bothOrders")
-	void aNodeThatDoesNotDiscover_stillDialsLearntOnionAddresses(final boolean beforeTheZone)
-		throws IOException
+	void aNodeThatDoesNotDiscover_dialsNoLearntOnionAddress(final boolean beforeTheZone)
+		throws Exception
 	{
 		try (Socks5Server socks = Socks5Server.start(); Socks5Server routeOfC = Socks5Server.start();
 			Node a = onionNode(socks, ONION_A, routeOfC);
@@ -222,8 +223,15 @@ class AnonymousInboundTest
 
 			c.connectAll(List.of(ONION_B));
 
-			await("c dialled a, learnt from b", () -> c.anonymousPeers().size() == 2);
-			assertEquals(2, routeOfC.requests().size(), routeOfC.requests().toString());
+			await("c heard of a from b, or dialled it",
+				() -> c.anonymousHeardOf().contains(ONION_A) || c.anonymousPeers().size() > 1);
+			// a dial would start on a thread of its own after the address is heard of; through the
+			// local SOCKS stub it opens within milliseconds, so a second is room enough to see one
+			Thread.sleep(1_000L);
+			assertEquals(1, c.anonymousPeers().size(), "c: " + c.refusals());
+			assertEquals(List.of(ONION_B.host()),
+				routeOfC.requests().stream().map(Socks5Server.Request::host).toList(),
+				"c opened a connection to b alone");
 		}
 	}
 

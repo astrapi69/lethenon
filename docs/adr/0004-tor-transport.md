@@ -115,8 +115,9 @@ the daemon does not already do.
    - Zone peers exchange onion addresses with `GET_PEERS` and `PEERS`, a peer exchange of the zone's
      own: an accepted zone peer is passed on by the onion address it announced, never as
      127.0.0.1; only onion addresses are kept from a `PEERS` in the zone; learnt ones are dialled
-     through the zone while it has room. Nothing learnt in the zone reaches the clearnet lists,
-     and nothing from the clearnet lists reaches the zone.
+     through the zone while it has room, unless `--no-discovery` (`Node.discoverPeers(false)`)
+     keeps the node with the peers it was given, in the zone as on the clearnet. Nothing learnt
+     in the zone reaches the clearnet lists, and nothing from the clearnet lists reaches the zone.
    - A zone slot that frees up is filled again, and an onion address that never completed a
      handshake is forgotten, as on the clearnet (#121).
 4. **The runbook against a real Tor.** `docs/tor.md`: the torrc lines (`SocksPort`,
