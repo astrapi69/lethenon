@@ -25,10 +25,12 @@
 package io.github.astrapi69.lethenon;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -60,19 +62,35 @@ class OneNativeLibraryPerUserTest
 	}
 
 	@Test
-	@DisplayName("today every killed writer leaves a copy of the native library of its own behind (#241)")
-	void everyKilledWriter_leavesACopyOfItsOwn() throws Exception
+	@DisplayName("killed writers leave no copy in the temporary directory; the user's cache holds one, written once and reused (#241)")
+	void killedWriters_shareOneCopyInTheCache() throws Exception
 	{
 		Path temporary = Files.createDirectories(directory.resolve("tmp"));
 		Path cache = Files.createDirectories(directory.resolve("cache"));
 
-		for (int writer = 0; writer < WRITERS; writer++)
+		killAfterItsFirstWrite(0, temporary, cache);
+		Path library = theOnlyLibraryIn(cache);
+		FileTime written = Files.getLastModifiedTime(library);
+		for (int writer = 1; writer < WRITERS; writer++)
 		{
 			killAfterItsFirstWrite(writer, temporary, cache);
 		}
 
-		assertEquals(WRITERS, librariesIn(temporary), "one copy per killed writer");
-		assertEquals(0, librariesIn(cache));
+		assertEquals(0, librariesIn(temporary), "no copy is left in the temporary directory");
+		assertEquals(library, theOnlyLibraryIn(cache), "one copy, in the same place");
+		assertEquals(written, Files.getLastModifiedTime(library), "reused, not written again");
+		assertTrue(library.startsWith(cache.resolve("lethenon").resolve("native")), library.toString());
+	}
+
+	private static Path theOnlyLibraryIn(final Path root) throws IOException
+	{
+		try (Stream<Path> files = Files.walk(root))
+		{
+			List<Path> libraries = files.filter(Files::isRegularFile)
+				.filter(file -> file.getFileName().toString().contains("sqlitejdbc")).toList();
+			assertEquals(1, libraries.size(), libraries.toString());
+			return libraries.getFirst();
+		}
 	}
 
 	private void killAfterItsFirstWrite(final int writer, final Path temporary, final Path cache)

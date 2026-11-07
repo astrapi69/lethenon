@@ -248,6 +248,7 @@ final class ChainDatabase
 
 	private static Connection open(final Path database) throws SQLException
 	{
+		SqliteNativeLibrary.prepare();
 		// through sqlite-jdbc's own driver, not the registry: DriverManager hands out only drivers
 		// its caller's class loader can see, and a host that loads lethenon in a loader of its own
 		// set the registry up from another one (#223)
