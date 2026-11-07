@@ -88,7 +88,7 @@ class NativeLibraryInClassLoadersTest
 	}
 
 	@Test
-	@DisplayName("two lethenons that open their first chain at the same moment, each in a class loader of its own, write, and sqlite-jdbc logs no failure to load the native library (#241)")
+	@DisplayName("two lethenons that open their first chain at the same moment, each in a class loader of its own, write, and sqlite-jdbc logs no failure to load the native library, in five JVMs (#241)")
 	void twoLethenonsTogether_loadTheLibraryWithoutAFailure() throws Exception
 	{
 		// the cache holds the library already, as on every start after the first
@@ -120,6 +120,47 @@ class NativeLibraryInClassLoadersTest
 		assertTrue(said.contains("lib.name " + HOST_NAME), () -> "the host's name is back: " + said);
 	}
 
+	@Test
+	@DisplayName("a host that set org.sqlite.lib.path keeps it: lethenon writes, claims nothing and leaves the cache empty (#241)")
+	void aLibraryPathOfTheHost_isKeptAndTheCacheLeftAlone() throws Exception
+	{
+		Path hostLibraries = Files.createDirectories(directory.resolve("host-libraries"));
+		List<String> said = hosted(List.of("-Dorg.sqlite.lib.path=" + hostLibraries), "host-path",
+			"host-path");
+
+		assertEquals(List.of(), failures(said), "sqlite-jdbc logged a failure to load its library");
+		assertWritten("host-path", said, "host.lethenon");
+		assertTrue(said.contains("lib.path " + hostLibraries), () -> "the host's path: " + said);
+		assertTrue(said.contains("claimed null"), () -> "lethenon claimed nothing: " + said);
+		assertEquals(0, librariesInTheCache(), "lethenon left the cache alone");
+	}
+
+	@Test
+	@DisplayName("today a lethenon on an interrupted thread waits the full five seconds for a claim nobody finishes, and one on a thread that is not waits them and writes (#241)")
+	void aStaleClaim_keepsAnInterruptedLethenonWaiting() throws Exception
+	{
+		List<String> said = hosted(List.of("-D" + SqliteNativeLibrary.CLAIMED_PROPERTY
+			+ "=a lethenon that never finishes"), "stale-claim", "stale-claim");
+
+		assertEquals(List.of(), failures(said), "sqlite-jdbc logged a failure to load its library");
+		assertWritten("stale-claim", said, "patient.lethenon");
+		assertTrue(said.contains("interrupt kept true"), () -> "the interrupt was kept: " + said);
+		long interrupted = millis(said, "interrupted waited ");
+		assertTrue(interrupted >= SqliteNativeLibrary.CLAIMANT_WAIT.toMillis() - 100,
+			() -> "the interrupted lethenon waited the full time: " + said);
+		long patient = millis(said, "patient waited ");
+		assertTrue(patient >= SqliteNativeLibrary.CLAIMANT_WAIT.toMillis() - 100,
+			() -> "the patient lethenon waited for the claim until the time ran out: " + said);
+	}
+
+	/** The milliseconds on the line the host said with the given start */
+	private static long millis(final List<String> said, final String start)
+	{
+		String line = said.stream().filter(each -> each.startsWith(start)).findFirst()
+			.orElseThrow(() -> new AssertionError("no line '" + start + "...': " + said));
+		return Long.parseLong(line.substring(start.length()).split(" ")[0]);
+	}
+
 	/**
 	 * Runs a scenario of {@link NativeLibraryHost} in a JVM of its own, with the user's cache and
 	 * the temporary directory under this test's directory, and checks that the host could see what
@@ -142,8 +183,20 @@ class NativeLibraryInClassLoadersTest
 			.redirectError(errors.toFile());
 		builder.environment().put("XDG_CACHE_HOME", directory.resolve("cache").toString());
 		Process host = builder.start();
+		boolean ended;
+		try
+		{
+			ended = host.waitFor(60, TimeUnit.SECONDS);
+		}
+		finally
+		{
+			if (host.isAlive())
+			{
+				host.destroyForcibly().waitFor();
+			}
+		}
 
-		assertTrue(host.waitFor(60, TimeUnit.SECONDS), "the host ended within a minute");
+		assertTrue(ended, "the host ended within a minute");
 		List<String> said = Files.readAllLines(output);
 		String errorOutput = Files.readString(errors);
 		assertEquals(0, host.exitValue(), () -> "the host failed: " + said + " " + errorOutput);
@@ -179,6 +232,10 @@ class NativeLibraryInClassLoadersTest
 	/** The copies of the native library in the user's cache of this test */
 	private long librariesInTheCache() throws IOException
 	{
+		if (!Files.isDirectory(directory.resolve("cache")))
+		{
+			return 0;
+		}
 		try (Stream<Path> files = Files.walk(directory.resolve("cache")))
 		{
 			return files.filter(Files::isRegularFile)

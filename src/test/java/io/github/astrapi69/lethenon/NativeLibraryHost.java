@@ -25,6 +25,8 @@
 package io.github.astrapi69.lethenon;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
@@ -52,11 +54,14 @@ import org.sqlite.JDBC;
  * own, because what is tested is JVM-wide: the system properties lethenon points sqlite-jdbc at its
  * cache with, and the class loader the JDK binds the native library to.
  * <p>
- * Arguments: the scenario ({@code again}, {@code other}, {@code together} or {@code host-name}) and
- * the directory to write the chains into. Lines: {@code capture works}, {@code slf4j absent},
- * {@code written <chain>}, {@code answered <n>}, {@code lib.name <value>}, one
- * {@code failure <message>} for every failure to load the library that sqlite-jdbc logged,
- * {@code mapped <file>} for every copy of the library the JVM mapped, and {@code done}
+ * Arguments: the scenario ({@code again}, {@code other}, {@code together}, {@code host-name},
+ * {@code host-path} or {@code stale-claim}) and the directory to write the chains into. Lines:
+ * {@code capture works}, {@code slf4j absent}, {@code written <chain>}, {@code answered <n>},
+ * {@code lib.name <value>}, {@code lib.path <value>}, {@code claimed <value>},
+ * {@code interrupted waited <ms> cpu <ms>}, {@code interrupt kept <boolean>},
+ * {@code patient waited <ms>}, one {@code failure <message>} for every failure to load the library
+ * that sqlite-jdbc logged, {@code mapped <file>} for every copy of the library the JVM mapped, and
+ * {@code done}
  */
 public final class NativeLibraryHost
 {
@@ -92,6 +97,8 @@ public final class NativeLibraryHost
 			case "other" -> other(directory);
 			case "together" -> together(directory);
 			case "host-name" -> hostName(directory);
+			case "host-path" -> hostPath(directory);
+			case "stale-claim" -> staleClaim(directory);
 			default -> throw new IllegalArgumentException("no such scenario: " + arguments[0]);
 		}
 		failures.forEach(failure -> say("failure " + failure));
@@ -158,6 +165,60 @@ public final class NativeLibraryHost
 			written(own, directory.resolve("host.lethenon"));
 		}
 		say("lib.name " + System.getProperty("org.sqlite.lib.name"));
+	}
+
+	/** lethenon in a class loader of its own, in a JVM started with a library path of the host's */
+	private static void hostPath(final Path directory) throws Exception
+	{
+		try (URLClassLoader own = OwnClassLoaders.overTheClassPath())
+		{
+			slf4j(own);
+			written(own, directory.resolve("host.lethenon"));
+		}
+		say("lib.path " + System.getProperty("org.sqlite.lib.path"));
+		say("claimed " + System.getProperty("lethenon.sqlite.lib.claimed"));
+	}
+
+	/**
+	 * A JVM started with a claim that nobody finishes, as one left by a lethenon that hangs: first
+	 * a lethenon on an interrupted thread prepares the library, then one on a thread that is not
+	 */
+	private static void staleClaim(final Path directory) throws Exception
+	{
+		try (URLClassLoader interrupted = OwnClassLoaders.overTheClassPath();
+			URLClassLoader patient = OwnClassLoaders.overTheClassPath())
+		{
+			slf4j(interrupted);
+			Thread.currentThread().interrupt();
+			long start = System.nanoTime();
+			long cpuStart = cpuNanos();
+			prepare(interrupted);
+			say("interrupted waited " + millisSince(start) + " cpu " + (cpuNanos() - cpuStart)
+				/ 1_000_000);
+			say("interrupt kept " + Thread.interrupted());
+			start = System.nanoTime();
+			written(patient, directory.resolve("patient.lethenon"));
+			say("patient waited " + millisSince(start));
+		}
+	}
+
+	/** Calls the loader's SqliteNativeLibrary.prepare(), which is not public */
+	private static void prepare(final ClassLoader loader) throws ReflectiveOperationException
+	{
+		Method prepare = Class.forName(SqliteNativeLibrary.class.getName(), true, loader)
+			.getDeclaredMethod("prepare");
+		prepare.setAccessible(true);
+		prepare.invoke(null);
+	}
+
+	private static long cpuNanos()
+	{
+		return ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+	}
+
+	private static long millisSince(final long start)
+	{
+		return (System.nanoTime() - start) / 1_000_000;
 	}
 
 	private static void writtenAfter(final CyclicBarrier start, final ClassLoader loader,
