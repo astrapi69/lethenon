@@ -26,7 +26,6 @@ package io.github.astrapi69.lethenon;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -233,16 +232,15 @@ class SeedPhraseTest
 	}
 
 	/**
-	 * Today a word entered with what {@link SeedPhrase#parse} drops around it - a non-breaking
-	 * space, a number in front, a comma - is not a known word, although parse reads it as that one
-	 * word and the Javadoc of isKnownWord reads a word as parse reads it
+	 * A word entered with what {@link SeedPhrase#parse} drops around it - a non-breaking space, a
+	 * number in front, a comma - is a known word, read as parse reads it
 	 */
 	@ParameterizedTest(name = "{argumentSetName}")
 	@MethodSource("enteredWords")
-	void aWordAsParseReadsIt_isNotKnown(final String entered, final String word)
+	void aWordAsParseReadsIt_isKnown(final String entered, final String word)
 	{
 		assertEquals(List.of(word), SeedPhrase.parse(entered));
-		assertFalse(SeedPhrase.isKnownWord(entered));
+		assertTrue(SeedPhrase.isKnownWord(entered));
 	}
 
 	/** One word as a program that asks for the words one at a time may get it, pasted */
