@@ -24,6 +24,7 @@
  */
 package io.github.astrapi69.lethenon.transport;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -80,6 +81,41 @@ final class Networks
 			GENESIS_TIME + DifficultyRule.TARGET_BLOCK_MILLIS * chain.size()), 1_000_000L)
 			.orElseThrow());
 		return List.copyOf(extended);
+	}
+
+	/**
+	 * Starts listening nodes that do not discover peers and connects them to a hub one after the
+	 * other, each once the hub holds the one before it. That fixes the order in which the hub was
+	 * connected to them, which is the order it passes their addresses on in (ADR 0003), and so the
+	 * order a newcomer dials them in (#278)
+	 *
+	 * @param genesis
+	 *            the chain the nodes start on
+	 * @param hub
+	 *            the hub, listening
+	 * @param hubPort
+	 *            the hub's port
+	 * @param count
+	 *            how many nodes
+	 * @return the nodes, in the order they were connected; the caller closes them
+	 * @throws IOException
+	 *             when a node cannot listen or connect
+	 */
+	static List<Node> connectedInTurn(final List<BlockBody> genesis, final Node hub,
+		final int hubPort, final int count) throws IOException
+	{
+		List<Node> others = new ArrayList<>();
+		for (int index = 0; index < count; index++)
+		{
+			Node other = Node.on(genesis).discoverPeers(false);
+			others.add(other);
+			int listening = other.listen(0);
+			other.connect("127.0.0.1", hubPort);
+			int expected = index + 1;
+			await(() -> "node " + expected + " at the hub, listening on " + listening,
+				() -> hub.peers().size() == expected);
+		}
+		return others;
 	}
 
 	/**
