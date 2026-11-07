@@ -27,14 +27,10 @@ package io.github.astrapi69.lethenon;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.File;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
@@ -57,44 +53,13 @@ class ChainFileOwnClassLoaderTest
 		// application's, as in a host where lethenon is not on the application class path
 		DriverManager.getDrivers();
 		Path chain = directory.resolve("own.lethenon");
-		try (URLClassLoader own = new URLClassLoader(classPath(),
-			ClassLoader.getPlatformClassLoader()))
+		try (URLClassLoader own = OwnClassLoaders.overTheClassPath())
 		{
-			writeNoTransfers(own, chain);
+			OwnClassLoaders.writeNoTransfers(own, chain);
 		}
 
 		assertTrue(Files.isRegularFile(chain), "the chain database was written");
 		assertEquals(List.of(), new ChainFile(chain).readPending(),
 			"and holds the empty list of waiting transfers it was given");
-	}
-
-	/** Writes an empty list of waiting transfers through the ChainFile of the given loader */
-	private static void writeNoTransfers(final ClassLoader loader, final Path chain)
-		throws Exception
-	{
-		Thread current = Thread.currentThread();
-		ClassLoader context = current.getContextClassLoader();
-		current.setContextClassLoader(ClassLoader.getPlatformClassLoader());
-		try
-		{
-			Class<?> chainFile = Class.forName(ChainFile.class.getName(), true, loader);
-			Object file = chainFile.getConstructor(Path.class).newInstance(chain);
-			chainFile.getMethod("writePending", List.class).invoke(file, new ArrayList<>());
-		}
-		finally
-		{
-			current.setContextClassLoader(context);
-		}
-	}
-
-	/** This test's class path, lethenon's classes and sqlite-jdbc among it */
-	private static URL[] classPath() throws MalformedURLException
-	{
-		List<URL> urls = new ArrayList<>();
-		for (String entry : System.getProperty("java.class.path").split(File.pathSeparator))
-		{
-			urls.add(new File(entry).toURI().toURL());
-		}
-		return urls.toArray(URL[]::new);
 	}
 }
