@@ -169,6 +169,16 @@ public final class Wallet
 		return String.join(" ", SeedPhrase.fromEntropy(entropy));
 	}
 
+	/**
+	 * Splits the wallet's entropy into shares, of which any {@code threshold} give the wallet back
+	 * (Shamir's secret sharing, from mystic-crypt)
+	 *
+	 * @param threshold
+	 *            how many shares restore the wallet
+	 * @param shares
+	 *            how many shares to make
+	 * @return the shares
+	 */
 	public List<SecretShare> split(final int threshold, final int shares)
 	{
 		return SecretSharing.split(entropy, threshold, shares);

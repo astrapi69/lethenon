@@ -79,8 +79,11 @@ public record Hello(int protocolVersion, String chainIdentifier, Bytes genesisHa
 	private static final byte[] MAGIC_BYTES = MAGIC.getBytes(StandardCharsets.US_ASCII);
 
 	/**
+	 * A HELLO's fields, checked before it is sent or read further
+	 *
 	 * @throws IllegalArgumentException
-	 *             for a listening port outside 0 to 65535
+	 *             for a listening port outside 0 to 65535, or an announced onion host that does not
+	 *             end in .onion
 	 */
 	public Hello
 	{
@@ -102,6 +105,23 @@ public record Hello(int protocolVersion, String chainIdentifier, Bytes genesisHa
 
 	/**
 	 * The HELLO of a node that announces no onion address: every clearnet HELLO
+	 *
+	 * @param protocolVersion
+	 *            the protocol the sender speaks
+	 * @param chainIdentifier
+	 *            the chain it is on
+	 * @param genesisHash
+	 *            the hash of that chain's genesis block
+	 * @param bestHeight
+	 *            the height of its best block
+	 * @param bestHash
+	 *            the hash of its best block
+	 * @param work
+	 *            the work of its chain up to that block
+	 * @param listenPort
+	 *            the port it listens on, 0 for none
+	 * @param nodeId
+	 *            its node identity, 0 for none
 	 */
 	public Hello(final int protocolVersion, final String chainIdentifier, final Bytes genesisHash,
 		final long bestHeight, final Bytes bestHash, final BigInteger work, final int listenPort,
@@ -114,6 +134,19 @@ public record Hello(int protocolVersion, String chainIdentifier, Bytes genesisHa
 	/**
 	 * The HELLO of a caller that does not listen and has no node identity: a command handing over
 	 * a transfer, a node taking its genesis block, a test
+	 *
+	 * @param protocolVersion
+	 *            the protocol the sender speaks
+	 * @param chainIdentifier
+	 *            the chain it is on
+	 * @param genesisHash
+	 *            the hash of that chain's genesis block
+	 * @param bestHeight
+	 *            the height of its best block
+	 * @param bestHash
+	 *            the hash of its best block
+	 * @param work
+	 *            the work of its chain up to that block
 	 */
 	public Hello(final int protocolVersion, final String chainIdentifier, final Bytes genesisHash,
 		final long bestHeight, final Bytes bestHash, final BigInteger work)

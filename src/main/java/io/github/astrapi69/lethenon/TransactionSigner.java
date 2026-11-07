@@ -150,6 +150,14 @@ public final class TransactionSigner
 		return new SignedTransaction(body, SignatureSuite.ED25519, Bytes.of(signature));
 	}
 
+	/**
+	 * Whether a transfer is signed by the key it names as its sender, under the suite it names
+	 *
+	 * @param transaction
+	 *            the signed transfer
+	 * @return true when the signature is valid; false for a wrong signature and for a key or a
+	 *         signature that cannot be read
+	 */
 	public static boolean verify(final SignedTransaction transaction)
 	{
 		try

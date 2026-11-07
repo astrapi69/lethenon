@@ -77,6 +77,9 @@ public record WalletScan(List<Received> received, Amount balance, long blocksRea
 	{
 	}
 
+	/**
+	 * Keeps the payments as an unmodifiable copy, so a scan cannot be changed after it was made
+	 */
 	public WalletScan
 	{
 		received = List.copyOf(received);
