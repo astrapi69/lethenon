@@ -26,7 +26,6 @@ package io.github.astrapi69.lethenon;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -140,16 +139,20 @@ class SeedPhraseTest
 	}
 
 	/**
-	 * Today a phrase in one of the forms people paste - numbered as a backup sheet shows it, with
-	 * commas, or with non-breaking spaces - does not parse to its words (#286)
+	 * A phrase in one of the forms people paste - numbered as a backup sheet shows it, with commas,
+	 * or with non-breaking spaces - parses to its words and gives its entropy back (#286)
 	 */
 	@ParameterizedTest(name = "{argumentSetName}")
 	@MethodSource("pastedForms")
-	void aPastedPhrase_doesNotParseToItsWords(final Function<List<String>, String> form)
+	void aPastedPhrase_parsesToItsWords(final Function<List<String>, String> form)
 	{
-		List<String> words = SeedPhrase.fromEntropy(entropyOfTwentyFourWords());
+		byte[] entropy = entropyOfTwentyFourWords();
+		List<String> words = SeedPhrase.fromEntropy(entropy);
 
-		assertNotEquals(words, SeedPhrase.parse(form.apply(words)));
+		List<String> parsed = SeedPhrase.parse(form.apply(words));
+
+		assertEquals(words, parsed);
+		assertArrayEquals(entropy, SeedPhrase.toEntropy(parsed));
 	}
 
 	/** The forms a phrase arrives in when it is pasted rather than typed (#286) */
