@@ -27,37 +27,20 @@ package io.github.astrapi69.lethenon;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.File;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.Driver;
 import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Handler;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.sqlite.JDBC;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * A host that loads lethenon in a class loader of its own, as mystic-crypt-ui's plugin manager
  * does (#223): lethenon and sqlite-jdbc are visible to that loader, not to the application's
- * class loader the JDBC driver registry was set up from. Such a host may load lethenon again, or
- * bring a sqlite-jdbc of its own, in the JVM whose native library lethenon prepared (#241)
+ * class loader the JDBC driver registry was set up from
  */
 class ChainFileOwnClassLoaderTest
 {
@@ -70,160 +53,13 @@ class ChainFileOwnClassLoaderTest
 		// application's, as in a host where lethenon is not on the application class path
 		DriverManager.getDrivers();
 		Path chain = directory.resolve("own.lethenon");
-		try (URLClassLoader own = new URLClassLoader(classPath(),
-			ClassLoader.getPlatformClassLoader()))
+		try (URLClassLoader own = OwnClassLoaders.overTheClassPath())
 		{
-			writeNoTransfers(own, chain);
+			OwnClassLoaders.writeNoTransfers(own, chain);
 		}
 
 		assertTrue(Files.isRegularFile(chain), "the chain database was written");
 		assertEquals(List.of(), new ChainFile(chain).readPending(),
 			"and holds the empty list of waiting transfers it was given");
-	}
-
-	@Test
-	@DisplayName("a lethenon loaded again, in a class loader of its own, writes, and its sqlite-jdbc logs no failure to load the native library (#241)")
-	void aLethenonLoadedAgain_loadsTheNativeLibraryWithoutAnError(@TempDir final Path directory)
-		throws Exception
-	{
-		Path first = directory.resolve("first.lethenon");
-		Path again = directory.resolve("again.lethenon");
-		List<String> failures;
-		try (
-			URLClassLoader once = new URLClassLoader(classPath(),
-				ClassLoader.getPlatformClassLoader());
-			URLClassLoader loadedAgain = new URLClassLoader(classPath(),
-				ClassLoader.getPlatformClassLoader()))
-		{
-			failures = nativeLibraryFailuresWhile(() -> {
-				writeNoTransfers(once, first);
-				writeNoTransfers(loadedAgain, again);
-			});
-		}
-
-		assertEquals(List.of(), failures, "sqlite-jdbc logged a failure to load its library");
-		assertEquals(List.of(), new ChainFile(again).readPending(),
-			"the lethenon loaded again wrote its chain");
-	}
-
-	@Test
-	@DisplayName("another program's sqlite-jdbc, in a class loader of its own, connects after lethenon, and logs no failure to load the native library (#241)")
-	void anotherSqliteJdbc_afterLethenon_loadsTheNativeLibraryWithoutAnError(
-		@TempDir final Path directory) throws Exception
-	{
-		URL sqliteJdbc = JDBC.class.getProtectionDomain().getCodeSource().getLocation();
-		AtomicInteger answer = new AtomicInteger();
-		List<String> failures;
-		try (
-			URLClassLoader lethenon = new URLClassLoader(classPath(),
-				ClassLoader.getPlatformClassLoader());
-			URLClassLoader otherProgram = new URLClassLoader(new URL[] { sqliteJdbc },
-				ClassLoader.getPlatformClassLoader()))
-		{
-			failures = nativeLibraryFailuresWhile(() -> {
-				writeNoTransfers(lethenon, directory.resolve("lethenon.lethenon"));
-				answer.set(selectOne(otherProgram, directory.resolve("other.db")));
-			});
-		}
-
-		assertEquals(List.of(), failures, "sqlite-jdbc logged a failure to load its library");
-		assertEquals(1, answer.get(), "the other program's connection answered");
-	}
-
-	/** Writes an empty list of waiting transfers through the ChainFile of the given loader */
-	private static void writeNoTransfers(final ClassLoader loader, final Path chain)
-		throws Exception
-	{
-		Thread current = Thread.currentThread();
-		ClassLoader context = current.getContextClassLoader();
-		current.setContextClassLoader(ClassLoader.getPlatformClassLoader());
-		try
-		{
-			Class<?> chainFile = Class.forName(ChainFile.class.getName(), true, loader);
-			Object file = chainFile.getConstructor(Path.class).newInstance(chain);
-			chainFile.getMethod("writePending", List.class).invoke(file, new ArrayList<>());
-		}
-		finally
-		{
-			current.setContextClassLoader(context);
-		}
-	}
-
-	/** Asks {@code select 1} of a database through the sqlite-jdbc driver of the given loader */
-	private static int selectOne(final ClassLoader loader, final Path database)
-		throws ReflectiveOperationException, SQLException
-	{
-		Driver driver = (Driver)Class.forName(JDBC.class.getName(), true, loader)
-			.getDeclaredConstructor().newInstance();
-		try (Connection connection = driver.connect("jdbc:sqlite:" + database, new Properties());
-			Statement statement = connection.createStatement();
-			ResultSet selected = statement.executeQuery("select 1"))
-		{
-			return selected.getInt(1);
-		}
-	}
-
-	/**
-	 * The failures to load the native library that sqlite-jdbc logs while the action runs: it logs
-	 * through java.util.logging, where no SLF4J is on its class path, as here
-	 */
-	private static List<String> nativeLibraryFailuresWhile(final Action action) throws Exception
-	{
-		Logger sqlite = Logger.getLogger("org.sqlite");
-		List<String> failures = new CopyOnWriteArrayList<>();
-		Handler listening = new Handler()
-		{
-			@Override
-			public void publish(final LogRecord logged)
-			{
-				if (logged.getThrown() instanceof UnsatisfiedLinkError refused)
-				{
-					failures.add(logged.getMessage() + ": " + refused.getMessage());
-				}
-			}
-
-			@Override
-			public void flush()
-			{
-			}
-
-			@Override
-			public void close()
-			{
-			}
-		};
-		sqlite.addHandler(listening);
-		try
-		{
-			action.run();
-		}
-		finally
-		{
-			sqlite.removeHandler(listening);
-		}
-		return failures;
-	}
-
-	/** What a test does while it listens to sqlite-jdbc's log */
-	private interface Action
-	{
-		/**
-		 * Runs the action
-		 *
-		 * @throws Exception
-		 *             whatever the action throws
-		 */
-		void run() throws Exception;
-	}
-
-	/** This test's class path, lethenon's classes and sqlite-jdbc among it */
-	private static URL[] classPath() throws MalformedURLException
-	{
-		List<URL> urls = new ArrayList<>();
-		for (String entry : System.getProperty("java.class.path").split(File.pathSeparator))
-		{
-			urls.add(new File(entry).toURI().toURL());
-		}
-		return urls.toArray(URL[]::new);
 	}
 }
