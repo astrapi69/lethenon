@@ -24,14 +24,14 @@
  */
 package io.github.astrapi69.lethenon;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
-import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.util.ArrayList;
@@ -50,22 +50,22 @@ class ChainFileOwnClassLoaderTest
 {
 
 	@Test
-	@DisplayName("today a chain written from a class loader of its own finds no SQLite driver")
-	void aChainWrittenFromItsOwnClassLoader_findsNoDriver(@TempDir final Path directory)
-		throws Exception
+	@DisplayName("a chain written from a class loader of its own opens, and reads back")
+	void aChainWrittenFromItsOwnClassLoader_opens(@TempDir final Path directory) throws Exception
 	{
 		// the registry loads its drivers once, from whichever loader asks first: the
 		// application's, as in a host where lethenon is not on the application class path
 		DriverManager.getDrivers();
+		Path chain = directory.resolve("own.lethenon");
 		try (URLClassLoader own = new URLClassLoader(classPath(),
 			ClassLoader.getPlatformClassLoader()))
 		{
-			InvocationTargetException refused = assertThrows(InvocationTargetException.class,
-				() -> writeNoTransfers(own, directory.resolve("own.lethenon")));
-
-			assertTrue(String.valueOf(refused.getCause().getMessage())
-				.contains("No suitable driver"), String.valueOf(refused.getCause()));
+			writeNoTransfers(own, chain);
 		}
+
+		assertTrue(Files.isRegularFile(chain), "the chain database was written");
+		assertEquals(List.of(), new ChainFile(chain).readPending(),
+			"and holds the empty list of waiting transfers it was given");
 	}
 
 	/** Writes an empty list of waiting transfers through the ChainFile of the given loader */
