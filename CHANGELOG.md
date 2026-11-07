@@ -1,6 +1,178 @@
 ## Change log
 ----------------------
 
+Version 0.8.1
+-------------
+
+**0.8.1 brings fixes, above all for a program that uses the library, such as mystic-crypt-ui's
+plugin.** A seed phrase pasted with the numbers of a backup sheet, with commas or with non-breaking
+spaces is read (#286), and so is a single word (#292). A host that loads lethenon in a class loader
+of its own opens chains (#223). A killed or crashed process no longer leaves a copy of sqlite-jdbc's
+native library in the temporary directory, and a second copy of lethenon or of sqlite-jdbc in the
+same JVM logs no error over it (#241). A node no longer stays below its twelve outgoing connections
+while it has addresses to dial (#278). Also in this release: `--no-discovery` holds in the anonymity
+zone too (#284), and the Windows launcher stops after its own error message, with the Gradle 9.8.2
+of #276. No API is added or removed, the declared dependencies are those of 0.8.0, and everything
+under CHANGED is in the build, the tests and the documentation.
+
+FORMAT:
+
+- **Nothing changes in what is written.** The chain database (ADR 0006), the wallet file, the block
+  encoding, HELLO and the peer list are those of 0.8.0. Since RELEASE-0.8.0 the code changed in
+  `SeedPhrase` (#286), in how `ChainDatabase` opens a connection and loads sqlite-jdbc's native
+  library (#223, #241), in `Discovery` (#278) and in `Node` (`--no-discovery`, #284). `BlockBody`,
+  `BlockLimits`, `TransactionBody`, `TransactionSigner`, `Wallet`, `WalletScan` and `Hello` changed in
+  their Javadoc only (`git diff -U0 RELEASE-0.8.0 <release commit> -- <file>`, every changed line a
+  comment), and no changed line of `ChainDatabase` is a statement of its schema.
+- **Measured on the release, against the published 0.8.0, in both directions**
+  (`docs/launch/compatibility-0.8.1/`):
+  - 0.8.0 is the tar.gz of the GitHub release, its `.sha256` and its signature by the release key's
+    signing subkey checked. This one was built from the release commit a15b09d with the full gate
+    (`./gradlew clean build installDist`: 95 classes, 895 tests, 0 failures, 0 errors, 0 skipped), on
+    JDK 25.0.5.
+  - Each version wrote a test chain of four blocks: an Ed25519 transfer of 12.5 LETH, 20 LETH to a
+    published address and its sweep, and 100 LETH to the holder's ML-DSA-65 account with 5 LETH from
+    it. Both compute the recipient's 17.5 LETH and the address owner's 20 LETH.
+  - **Each version on a chain the other wrote:** the same balances and the same supply, and reading
+    leaves the file as it was. A transfer of 7 LETH left waiting by one version is mined by the other,
+    and the first reads the block back: the recipient holds 24.5 LETH after 5 blocks.
+  - **Wallets in both directions:** each version computes the balances of the other's wallets.
+  - **The network**, in a namespace of its own (`unshare -rn`, loopback only): `sync` from a node of
+    the other version takes the whole chain, and it replays to the same blocks, transfers and supply,
+    in both directions. A miner of one version with a node of the other as its peer: the peer took
+    every block, 208 from a miner of 0.8.1 and 207 from a miner of 0.8.0, and ended at the miner's
+    height.
+  - 46 rows in `results.tsv`: 36 commands, every one exit 0, and 10 checks, every one passed; none a
+    mismatch. Commands: `bash docs/launch/compatibility-0.8.1/build.sh a15b09d`, then `bash
+    docs/launch/compatibility-0.8.1/measure.sh`. The network part needs a user namespace, which a
+    systemd service may refuse (`/proc/self/uid_map`). `measure.sh` then fails, where 0.8.0's script
+    went on and said done without a network row.
+- **The way back to 0.5.0 is not measured again**: `lethenon export` is that of 0.8.0
+  (`git diff --stat RELEASE-0.8.0 a15b09d -- src/main/java/io/github/astrapi69/lethenon/ChainExport.java
+  src/main/java/io/github/astrapi69/lethenon/cli/ExportCommand.java` is empty), and the chain database
+  only opens its connection another way, so 0.7.0's round trip still stands for it.
+
+FIXED:
+
+- `SeedPhrase.parse` reads a phrase as people paste it (#286). It may be numbered with `1.`, `1)`,
+  `01`, `1:` or a bare number, with or without a space after it, and it may have commas, or a
+  non-breaking space (U+00A0) or any other Unicode space separator between the words.
+  `Wallet.fromPhrase` reads through it, and so does `lethenon wallet restore`, which takes the
+  phrase on the first line of standard input. Such a phrase was refused as an unknown word or a wrong
+  word count, which is why mystic-crypt-ui's plugin refused the words copied from its own numbered
+  backup display (astrapi69/mystic-crypt-ui#802). Other marks are still refused, among them a hyphen
+  or `(1)` in front of a word and a semicolon after one. `SeedPhrase.isKnownWord` reads a single word
+  the same way (#292): a word of the list with any of these marks around it is a known word, two words or a
+  number alone are not. Measured in `SeedPhraseTest`: ten pasted forms of a 24-word phrase each parse
+  to its words and give its entropy back, and all ten were red before the change; seven single words,
+  among them `1.abandon`, `zoo,` and a word with U+00A0, U+2007 or U+202F around it, are known words,
+  and all seven were red before
+- a host that loads lethenon in a class loader of its own, a pf4j plugin host for example, opens chains
+  (#223). lethenon takes its SQLite connection from sqlite-jdbc's driver class itself
+  (`org.sqlite.JDBC.createConnection`) instead of asking `java.sql.DriverManager`. The registry hands
+  out only drivers its caller's class loader can see, and in such a host it had none for lethenon,
+  whether no SQLite driver was registered at all or only the application's. Opening a chain failed
+  with "No suitable driver found for jdbc:sqlite:..." unless `org.sqlite.JDBC` had first been
+  initialised through the class loader that loads lethenon, the workaround mystic-crypt-ui's plugin
+  carries. The command line was not affected, because there the library and the driver share one
+  class path. Measured in `ChainFileOwnClassLoaderTest`, which writes a chain through a class loader of
+  its own after the registry was set up from the application's, and reads it back; red before the
+  change with "No suitable driver found for jdbc:sqlite:..."
+- a process ended with `kill -9`, a crash or a power cut no longer leaves a copy of sqlite-jdbc's native
+  library behind in the temporary directory: one copy per user and sqlite-jdbc version lives in the
+  user's cache (#241). sqlite-jdbc extracts a fresh copy, 1.1 MB on Linux x86_64, in every JVM that
+  loads it, and removes it only when the JVM ends normally, so every node, command or host ended that
+  way added one.
+  - Before its first database connection, the first lethenon of a JVM puts the library once into
+    `$XDG_CACHE_HOME/lethenon/native/<sqlite-jdbc version>/<os>/<arch>/`, or `~/.cache/lethenon/...`
+    when `XDG_CACHE_HOME` is unset, empty or not an absolute path, and reuses it while its bytes
+    match.
+  - It has sqlite-jdbc load it from there through the system properties `org.sqlite.lib.path` and
+    `org.sqlite.lib.name`, which it sets only while sqlite-jdbc loads and takes back then.
+  - Every sqlite-jdbc in the JVM reads those properties, and a native library loads into one class
+    loader only. So the first lethenon claims the cache, in one step
+    (`lethenon.sqlite.lib.claimed`). Another lethenon in the same JVM, a plugin loaded again or one
+    starting at the same moment, and another program's sqlite-jdbc each extract a copy of their own,
+    as before, without logging an error once the first lethenon's load is done. A sqlite-jdbc that is
+    not lethenon's and loads its library in the few milliseconds the properties are set still reads
+    them and logs the failure.
+  - A host that set `org.sqlite.lib.path` itself keeps its choice, and a library name it set in
+    `org.sqlite.lib.name` is put back.
+  - Where the cache cannot be written, sqlite-jdbc extracts as before. Copies that earlier runs left in
+    the temporary directory are not removed.
+  - Measured in `OneNativeLibraryPerUserTest`: three writers, each killed after its first write, leave
+    no copy in their temporary directory, and the cache holds one, written by the first and reused by
+    the others; red before the change, with no copy in the cache. And in
+    `NativeLibraryInClassLoadersTest`, each case in a JVM of its own: lethenon loaded again, another
+    program's sqlite-jdbc after lethenon, and two lethenons at one moment all write and connect, and
+    sqlite-jdbc logs no failure to load its library. With the properties left set, as the change first
+    had them, it logged `Failed to load native library` with "already loaded in another classloader"
+- a node no longer stays below its twelve outgoing connections while it has addresses it could dial
+  (#278). A dial was counted twice between the slot it takes and the end of its connect, so a fill
+  that ran then stopped one slot early, and only a failed dial filled again. Now every dial that
+  found room fills again when it ends. The slot stayed free, with no refusal to explain it, until
+  the next PEERS answer, an ended connection or a failed dial; nothing of a chain or a wallet was
+  touched. It has been so since peer exchange came in 0.3.0. Measured in `DiscoveryTest`, which
+  forces a dial and two fills into that order: eleven outgoing connections before the change, twelve
+  after. And in the twelve-outgoing scenario with 16 virtual-thread carriers on two loaded cores: 3
+  of 149 runs stuck at eleven for 60 s before, none of 150 after
+- `lethenon node --no-discovery` keeps a node with its given peers in the anonymity zone (`--tx-proxy`)
+  too (#284), and so does `Node.discoverPeers(false)` in the library. The switch never reached the
+  zone's own peer exchange, so such a node still dialled, through the zone's proxy, the onion addresses
+  a zone peer passed on while the zone had room (10 peers on the command line unless `--tx-proxy` names
+  another maximum). That peer could therefore choose the node's other zone connections. The node still
+  hears of those addresses and dials none of them, whether the switch is set before or after the zone.
+  With discovery on, the default, nothing changes. Measured in `AnonymousInboundTest`, with the switch
+  set before the zone and after it: the node hears of the learnt address and opens a connection to
+  its given peer alone; red before the change, with two zone peers instead of one
+- the Windows launcher of the command line, `bin\lethenon.bat`, ends with exit code 1 right after it
+  reports that no `java` was found or that `JAVA_HOME` names a directory without one. The launcher of
+  0.8.0 ran on past its message into the `JAVA_HOME` check and an attempt to start Java. The launcher
+  is Gradle's start script, and the build moved from Gradle 9.7.1 to 9.8.2 under #276, whose script
+  stops there; read from the two generated scripts. Windows itself is still untried
+  (`docs/testnet.md`)
+- `AnonymousInboundTest`'s "a learnt onion address that never says HELLO gives its zone slot back" no
+  longer fails when the node under test asks for peers late (#282), as it did once in CI. The node
+  that passed the address on forgot it once its own handshake with it timed out, after
+  `Node.HANDSHAKE_MILLIS` (5 s), so the node under test, asking later, never heard of it. The address is
+  now a live onion node for the other nodes, so it stays known, and a mute listener only the node under
+  test reaches, so the test also proves that this node dialled it. Reproduced with a pause of
+  `Node.HANDSHAKE_MILLIS` and one second before the node under test connects: the old test fails with
+  the CI run's message, the new one passes
+
+CHANGED:
+
+- a Javadoc warning fails the build; the Javadoc is English in any locale (#290). The `javadoc` task
+  runs with `-Werror` and `failOnError` and `check` depends on it, so CI and a release's publish run
+  stop on a missing comment; the published Javadoc of 0.8.0 was English already. The missing comments
+  are written, not suppressed, among them those of the compact constructors of `BlockBody`,
+  `BlockLimits`, `TransactionBody`, `WalletScan` and `Hello`, and of `TransactionSigner.verify` and
+  `Wallet.split`; only comments change in those sources
+- the test task fails the build, naming the classes, when a compiled test class left no JUnit XML
+  result (#267). A test that ends the test JVM early, with `System.exit` for example, can therefore no
+  longer let the build pass over classes that never ran; a run narrowed with `--tests` is not checked
+  and says so. The check is the Gradle plugin `io.github.astrapi69.test-results-complete` 1.0,
+  published on Maven Central, instead of a copied script (#276);
+  `settings.gradle` resolves build plugins from the Gradle Plugin Portal and from Maven Central
+- `PeerExchangeTest`'s "a node keeps at most twelve outgoing connections however many it learns of"
+  waits until the newcomer has learnt the hub's addresses and has settled, at twelve peers or with
+  nothing left to dial (#278). It then asserts what holds however the dials end: never more than
+  twelve, twelve whenever an address is still heard of, and, when no dial failed, the three addresses
+  beyond the twelve all heard of. It runs with every learnt address answering and with three that
+  refuse. `FailedDialTest` measures what a refused learnt address does: it is forgotten with its
+  refusal recorded, as ADR 0003 says, so three refused of fourteen leave twelve peers and nothing
+  heard of. A wait that runs out names the newcomer's peers, its outgoing connections, what it heard
+  of and its refusals
+- the README has a section "How this project is made", before the licence: the project is developed
+  with AI agents as a tool, its maintainer sets the goals, the rules and the architecture, and the
+  section links the family-wide statement `AI_USAGE.md` (#279)
+
+NOT YET IMPLEMENTED:
+
+- `node --mine` computes on one thread (#201)
+- a node or command that migrates a chain file of 0.5.0 prints no line about it (#219)
+- `ChainFile` cannot tell a caller beforehand whether reading a file would migrate it (#222)
+
 Version 0.8.0
 -------------
 
