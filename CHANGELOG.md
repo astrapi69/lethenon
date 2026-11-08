@@ -12,8 +12,10 @@ native library in the temporary directory, and a second copy of lethenon or of s
 same JVM logs no error over it (#241). A node no longer stays below its twelve outgoing connections
 while it has addresses to dial (#278). Also in this release: `--no-discovery` holds in the anonymity
 zone too (#284), and the Windows launcher stops after its own error message, with the Gradle 9.8.2
-of #276. No API is added or removed, the declared dependencies are those of 0.8.0, and everything
-under CHANGED is in the build, the tests and the documentation.
+of #276. No API is added or removed. The declared dependencies are those of 0.8.0, except that
+commons-collections4 is held at 4.6.0: the libraries underneath bring the milestone 4.5.0-M2, and a
+release ships no pre-release. Everything under CHANGED is in the build, the tests and the
+documentation.
 
 FORMAT:
 
@@ -27,9 +29,9 @@ FORMAT:
 - **Measured on the release, against the published 0.8.0, in both directions**
   (`docs/launch/compatibility-0.8.1/`):
   - 0.8.0 is the tar.gz of the GitHub release, its `.sha256` and its signature by the release key's
-    signing subkey checked. This one was built from the release commit a15b09d with the full gate
-    (`./gradlew clean build installDist`: 95 classes, 895 tests, 0 failures, 0 errors, 0 skipped), on
-    JDK 25.0.5.
+    signing subkey checked. This one was built from c44bbed, whose code and build are the release's,
+    with the full gate (`./gradlew clean build installDist`: 95 classes, 896 tests, 0 failures, 0
+    errors, 0 skipped), on JDK 25.0.5.
   - Each version wrote a test chain of four blocks: an Ed25519 transfer of 12.5 LETH, 20 LETH to a
     published address and its sweep, and 100 LETH to the holder's ML-DSA-65 account with 5 LETH from
     it. Both compute the recipient's 17.5 LETH and the address owner's 20 LETH.
@@ -40,15 +42,15 @@ FORMAT:
   - **The network**, in a namespace of its own (`unshare -rn`, loopback only): `sync` from a node of
     the other version takes the whole chain, and it replays to the same blocks, transfers and supply,
     in both directions. A miner of one version with a node of the other as its peer: the peer took
-    every block, 208 from a miner of 0.8.1 and 207 from a miner of 0.8.0, and ended at the miner's
+    every block, 212 from a miner of 0.8.1 and 206 from a miner of 0.8.0, and ended at the miner's
     height.
   - 46 rows in `results.tsv`: 36 commands, every one exit 0, and 10 checks, every one passed; none a
-    mismatch. Commands: `bash docs/launch/compatibility-0.8.1/build.sh a15b09d`, then `bash
+    mismatch. Commands: `bash docs/launch/compatibility-0.8.1/build.sh c44bbed`, then `bash
     docs/launch/compatibility-0.8.1/measure.sh`. The network part needs a user namespace, which a
     systemd service may refuse (`/proc/self/uid_map`). `measure.sh` then fails, where 0.8.0's script
     went on and said done without a network row.
 - **The way back to 0.5.0 is not measured again**: `lethenon export` is that of 0.8.0
-  (`git diff --stat RELEASE-0.8.0 a15b09d -- src/main/java/io/github/astrapi69/lethenon/ChainExport.java
+  (`git diff --stat RELEASE-0.8.0 c44bbed -- src/main/java/io/github/astrapi69/lethenon/ChainExport.java
   src/main/java/io/github/astrapi69/lethenon/cli/ExportCommand.java` is empty), and the chain database
   only opens its connection another way, so 0.7.0's round trip still stands for it.
 
@@ -131,6 +133,14 @@ FIXED:
   is Gradle's start script, and the build moved from Gradle 9.7.1 to 9.8.2 under #276, whose script
   stops there; read from the two generated scripts. Windows itself is still untried
   (`docs/testnet.md`)
+- the command line distribution ships no pre-release: `lib/` holds commons-collections4 4.6.0
+  instead of the milestone 4.5.0-M2 that 0.8.0 shipped. lethenon does not use it itself. The family's
+  comparator-extensions 2 brings the milestone, through silly-collection 28.2, which mystic-crypt
+  13.9 and crypt-data 13.2 use. A dependency constraint raises it to 4.6.0, the version
+  silly-collection 29.1 and comparator-extensions 3.1 declare, until the libraries bring a final
+  release themselves. Of the 45 jars in `lib/`, the two that call into it call 8 of its members, and
+  all 8 are in 4.6.0 with the same signatures. Measured in `RuntimeDependenciesTest`, which finds
+  no pre-release on the class path; red before the change, with the milestone
 - `AnonymousInboundTest`'s "a learnt onion address that never says HELLO gives its zone slot back" no
   longer fails when the node under test asks for peers late (#282), as it did once in CI. The node
   that passed the address on forgot it once its own handshake with it timed out, after
