@@ -4,6 +4,13 @@ A protest chain against the politics of surveillance: a joke currency whose poin
 demonstration. Java 25, Gradle, JUnit 6. The library goes to Maven Central (#30), the chain does not:
 no pool, no listing, nothing tradeable.
 
+## Family rules
+
+The rules every agent session in this family follows are public at
+<https://github.com/astrapi69/astrapi69/tree/main/rules>. Read them before any work: the entry point
+`rules/index.md` and the core under `rules/core/`, which `index.md` loads into every session. The
+rules in this repository add only what is specific to it.
+
 ## The first rule
 
 **Use this family's libraries - crypt-api, crypt-data, mystic-crypt, checksum-up, gen-tree - and
@@ -36,7 +43,9 @@ financial product with real losers, and in the EU it falls under MiCA.
   fails when the chain package can name a networking type at all)
 - `./gradlew build` prints what ran, including "no test classes" while that is true
 - no attribution to a non-human collaborator: no `Co-Authored-By` trailer for an AI tool or a
-  bot, no commit authored or committed under an AI tool's identity, no "generated with" line in a
-  pull request. Enforced by `scripts/check-commit-provenance.sh` in CI and in `.githooks`
+  bot, no commit authored or committed under an AI tool's identity, no session link
+  (`Claude-Session:` trailer or a link into a session) and no "Generated with/by" line, in a commit
+  or a pull request description. Enforced by `scripts/check-commit-provenance.sh` in CI, which also
+  checks the description and checks it again when it is edited, and in `.githooks`
   (`git config core.hooksPath .githooks`); an exception carries `Co-Author-Exception: <reason>` in
-  the commit body (#10)
+  the same text (#10, #279)

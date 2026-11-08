@@ -33,6 +33,8 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -49,6 +51,35 @@ import org.junit.jupiter.params.provider.CsvSource;
  */
 class RuntimeDependenciesTest
 {
+
+	/**
+	 * A pre-release on the class path: a milestone, a release candidate, an alpha, a beta, a preview,
+	 * an early access build or a snapshot, as the jar's name says it
+	 */
+	private static final Pattern PRE_RELEASE = Pattern
+		.compile(".*-\\d[^/]*[-.](M\\d+|[Rr][Cc]\\d*|alpha\\d*|beta\\d*|preview\\d*|ea|SNAPSHOT)\\.jar");
+
+	/**
+	 * A release ships no pre-release. The family's comparator-extensions 2 brings the milestone
+	 * commons-collections4 4.5.0-M2, through silly-collection 28.2, which mystic-crypt 13.9 and
+	 * crypt-data 13.2 use, and the command line distribution of 0.8.0 shipped it; a dependency
+	 * constraint raises it to 4.6.0 since 0.8.1
+	 */
+	@Test
+	@DisplayName("no pre-release on the class path, commons-collections4 4.5.0-M2 among them")
+	void theClassPath_holdsNoPreRelease()
+	{
+		assertEquals(List.of(), preReleases());
+	}
+
+	private static List<String> preReleases()
+	{
+		return Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
+			.map(entry -> new File(entry).getName())
+			.filter(name -> PRE_RELEASE.matcher(name).matches())
+			.sorted()
+			.toList();
+	}
 
 	@ParameterizedTest(name = "{0} is at least {1}")
 	@CsvSource({ "jackson-core, 2.22.4", "jackson-databind, 2.22.4", "jackson-annotations, 2.22",

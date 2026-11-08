@@ -32,11 +32,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvFileSource;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -131,6 +138,66 @@ class SeedPhraseTest
 				+ "abandon abandon abandon\n About "));
 	}
 
+	/**
+	 * A phrase in one of the forms people paste - numbered as a backup sheet shows it, with commas,
+	 * or with non-breaking spaces - parses to its words and gives its entropy back (#286)
+	 */
+	@ParameterizedTest(name = "{argumentSetName}")
+	@MethodSource("pastedForms")
+	void aPastedPhrase_parsesToItsWords(final Function<List<String>, String> form)
+	{
+		byte[] entropy = entropyOfTwentyFourWords();
+		List<String> words = SeedPhrase.fromEntropy(entropy);
+
+		List<String> parsed = SeedPhrase.parse(form.apply(words));
+
+		assertEquals(words, parsed);
+		assertArrayEquals(entropy, SeedPhrase.toEntropy(parsed));
+	}
+
+	/** The forms a phrase arrives in when it is pasted rather than typed (#286) */
+	static Stream<Arguments> pastedForms()
+	{
+		return Stream.of(
+			Arguments.argumentSet("separated by non-breaking spaces",
+				joined("\u00A0", (number, word) -> word)),
+			Arguments.argumentSet("numbered 1. on one line", joined(" ", (number, word) -> number
+				+ ". " + word)),
+			Arguments.argumentSet("numbered 1. one per line", joined("\n", (number, word) -> number
+				+ ". " + word)),
+			Arguments.argumentSet("numbered 1) on one line", joined(" ", (number, word) -> number
+				+ ") " + word)),
+			Arguments.argumentSet("numbered 01 one per line", joined("\n",
+				(number, word) -> String.format("%02d", number) + " " + word)),
+			Arguments.argumentSet("numbered 1: on one line", joined(" ", (number, word) -> number
+				+ ": " + word)),
+			Arguments.argumentSet("numbered with a bare number", joined(" ", (number, word) -> number
+				+ " " + word)),
+			Arguments.argumentSet("numbered 1. without a space", joined(" ", (number, word) -> number
+				+ "." + word)),
+			Arguments.argumentSet("comma and space", joined(", ", (number, word) -> word)),
+			Arguments.argumentSet("comma alone", joined(",", (number, word) -> word)));
+	}
+
+	private static Function<List<String>, String> joined(final String separator,
+		final BiFunction<Integer, String, String> eachWord)
+	{
+		return words -> IntStream.range(0, words.size())
+			.mapToObj(index -> eachWord.apply(index + 1, words.get(index)))
+			.collect(Collectors.joining(separator));
+	}
+
+	/** 32 bytes of entropy, 24 words, every one of them different from its neighbours */
+	private static byte[] entropyOfTwentyFourWords()
+	{
+		byte[] entropy = new byte[32];
+		for (int index = 0; index < entropy.length; index++)
+		{
+			entropy[index] = (byte)(index * 37 + 11);
+		}
+		return entropy;
+	}
+
 	@Test
 	void theWordListIsThePublishedOne_andAnAlteredOneIsRefused() throws Exception
 	{
@@ -156,11 +223,39 @@ class SeedPhraseTest
 	@CsvSource(delimiter = '|', value = { "the first word of the list|abandon|true",
 			"the last word of the list|zoo|true", "a word in capitals|Abandon|true",
 			"a word with spaces around it|'  zoo '|true", "a word that is not in the list|lethenon|false",
-			"one letter short of a word|abando|false", "an empty word|''|false" })
+			"one letter short of a word|abando|false", "an empty word|''|false",
+			"two words of the list|abandon zoo|false", "a number alone|1.|false" })
 	void aWordIsKnownOnlyWhenItIsInTheList(final String name, final String word,
 		final boolean known)
 	{
 		assertEquals(known, SeedPhrase.isKnownWord(word));
+	}
+
+	/**
+	 * A word entered with what {@link SeedPhrase#parse} drops around it - a non-breaking space, a
+	 * number in front, a comma - is a known word, read as parse reads it
+	 */
+	@ParameterizedTest(name = "{argumentSetName}")
+	@MethodSource("enteredWords")
+	void aWordAsParseReadsIt_isKnown(final String entered, final String word)
+	{
+		assertEquals(List.of(word), SeedPhrase.parse(entered));
+		assertTrue(SeedPhrase.isKnownWord(entered));
+	}
+
+	/** One word as a program that asks for the words one at a time may get it, pasted */
+	static Stream<Arguments> enteredWords()
+	{
+		return Stream.of(
+			Arguments.argumentSet("a non-breaking space in front (U+00A0)", " abandon",
+				"abandon"),
+			Arguments.argumentSet("a figure space behind (U+2007)", "zoo ", "zoo"),
+			Arguments.argumentSet("narrow no-break spaces around (U+202F)", " abandon ",
+				"abandon"),
+			Arguments.argumentSet("numbered 1. without a space", "1.abandon", "abandon"),
+			Arguments.argumentSet("numbered 1. with a space", "1. zoo", "zoo"),
+			Arguments.argumentSet("numbered 01", "01 abandon", "abandon"),
+			Arguments.argumentSet("a comma behind", "zoo,", "zoo"));
 	}
 
 	@Test

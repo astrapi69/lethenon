@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
@@ -75,6 +76,12 @@ public final class SeedPhrase
 	private static final int SEED_BITS = 512;
 
 	private static final int BITS_PER_WORD = 11;
+
+	/** What stands between the words of a phrase: whitespace, any Unicode space separator, commas */
+	private static final Pattern SEPARATORS = Pattern.compile("[\\s\\p{Z},]+");
+
+	/** A number in front of a word, as a backup sheet numbers the words */
+	private static final Pattern NUMBERING = Pattern.compile("^\\d+[.):]?");
 
 	private static final List<String> WORDS = loadWordList();
 
@@ -171,7 +178,12 @@ public final class SeedPhrase
 	}
 
 	/**
-	 * The words of a phrase as somebody typed it: any whitespace between them, any case
+	 * The words of a phrase as somebody typed or pasted it: any whitespace between them, the
+	 * non-breaking space and every other Unicode space separator included, and commas; a number in
+	 * front of a word, as a backup sheet numbers it ({@code 1.}, {@code 1)}, {@code 01},
+	 * {@code 1:} or bare), is dropped; any case (#286). No word of the list holds a digit or a
+	 * comma, so nothing of a word is lost; what is left that is no word is refused later, as an
+	 * unknown word or a wrong count
 	 *
 	 * @param phrase
 	 *            the phrase
@@ -179,26 +191,33 @@ public final class SeedPhrase
 	 */
 	public static List<String> parse(final String phrase)
 	{
-		String trimmed = phrase.strip();
-		if (trimmed.isEmpty())
+		List<String> words = new ArrayList<>();
+		for (String token : SEPARATORS.split(phrase))
 		{
-			return List.of();
+			String word = NUMBERING.matcher(token).replaceFirst("");
+			if (!word.isEmpty())
+			{
+				words.add(word.toLowerCase(Locale.ROOT));
+			}
 		}
-		return List.of(trimmed.toLowerCase(Locale.ROOT).split("\\s+"));
+		return List.copyOf(words);
 	}
 
 	/**
-	 * Whether a word is in the BIP-39 English word list, read as {@link #parse} reads it: in lower
-	 * case and without the spaces around it. A program that asks for words one at a time can name a
-	 * misspelled word at once, without reading an error message
+	 * Whether a word is in the BIP-39 English word list, read as {@link #parse} reads it: in any
+	 * case, without the whitespace, the Unicode space separators and the commas around it, and
+	 * without a number in front of it; what is left must be exactly one word, so two words are no
+	 * known word. A program that asks for words one at a time can name a misspelled word at once,
+	 * without reading an error message
 	 *
 	 * @param word
-	 *            the word
+	 *            the word as entered
 	 * @return true for a word of the list
 	 */
 	public static boolean isKnownWord(final String word)
 	{
-		return INDEX.containsKey(word.strip().toLowerCase(Locale.ROOT));
+		List<String> words = parse(word);
+		return words.size() == 1 && INDEX.containsKey(words.getFirst());
 	}
 
 	/**

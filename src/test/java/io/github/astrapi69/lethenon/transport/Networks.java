@@ -24,10 +24,12 @@
  */
 package io.github.astrapi69.lethenon.transport;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 import io.github.astrapi69.lethenon.BlockBody;
 import io.github.astrapi69.lethenon.Blocks;
@@ -82,6 +84,41 @@ final class Networks
 	}
 
 	/**
+	 * Starts listening nodes that do not discover peers and connects them to a hub one after the
+	 * other, each once the hub holds the one before it. That fixes the order in which the hub was
+	 * connected to them, which is the order it passes their addresses on in (ADR 0003), and so the
+	 * order a newcomer dials them in (#278)
+	 *
+	 * @param genesis
+	 *            the chain the nodes start on
+	 * @param hub
+	 *            the hub, listening
+	 * @param hubPort
+	 *            the hub's port
+	 * @param count
+	 *            how many nodes
+	 * @return the nodes, in the order they were connected; the caller closes them
+	 * @throws IOException
+	 *             when a node cannot listen or connect
+	 */
+	static List<Node> connectedInTurn(final List<BlockBody> genesis, final Node hub,
+		final int hubPort, final int count) throws IOException
+	{
+		List<Node> others = new ArrayList<>();
+		for (int index = 0; index < count; index++)
+		{
+			Node other = Node.on(genesis).discoverPeers(false);
+			others.add(other);
+			int listening = other.listen(0);
+			other.connect("127.0.0.1", hubPort);
+			int expected = index + 1;
+			await(() -> "node " + expected + " at the hub, listening on " + listening,
+				() -> hub.peers().size() == expected);
+		}
+		return others;
+	}
+
+	/**
 	 * Waits until the condition holds, at most ten seconds
 	 *
 	 * @throws AssertionError
@@ -106,13 +143,32 @@ final class Networks
 	 */
 	static void await(final String what, final BooleanSupplier condition, final Duration limit)
 	{
+		await(() -> what, condition, limit);
+	}
+
+	/**
+	 * Waits until the condition holds, at most ten seconds, and says what was waited for only when
+	 * the time runs out: the description reads the state at that moment, so a failure shows what
+	 * stood in the way (#278)
+	 *
+	 * @throws AssertionError
+	 *             with the description as it reads when the deadline passes
+	 */
+	static void await(final Supplier<String> what, final BooleanSupplier condition)
+	{
+		await(what, condition, Duration.ofSeconds(10));
+	}
+
+	private static void await(final Supplier<String> what, final BooleanSupplier condition,
+		final Duration limit)
+	{
 		long wallStart = System.currentTimeMillis();
 		long deadline = System.nanoTime() + limit.toNanos();
 		while (!condition.getAsBoolean())
 		{
 			if (System.nanoTime() > deadline)
 			{
-				throw new AssertionError("waited " + readable(limit) + " for " + what
+				throw new AssertionError("waited " + readable(limit) + " for " + what.get()
 					+ "; the wall clock moved " + (System.currentTimeMillis() - wallStart)
 					+ " ms meanwhile\n" + threads());
 			}
@@ -124,7 +180,7 @@ final class Networks
 			catch (InterruptedException interrupted)
 			{
 				Thread.currentThread().interrupt();
-				throw new AssertionError("interrupted while waiting for " + what);
+				throw new AssertionError("interrupted while waiting for " + what.get());
 			}
 		}
 	}

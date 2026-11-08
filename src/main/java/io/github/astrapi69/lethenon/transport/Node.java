@@ -122,6 +122,9 @@ public final class Node implements AutoCloseable
 
 	private volatile AnonymityZone zone;
 
+	/** Whether learnt addresses are dialled, on the clearnet and in a zone set up later */
+	private volatile boolean discoversPeers = true;
+
 	private volatile ServerSocket anonymousServer;
 
 	private volatile PeerAddress announcedOnion;
@@ -845,6 +848,7 @@ public final class Node implements AutoCloseable
 		AnonymityZone anonymous = new AnonymityZone(route, maximum, anonymousId);
 		anonymous.discovery(new Discovery(anonymous.peers(), refusals, zoneDialer(anonymous),
 			threads));
+		anonymous.discovery().dialling(discoversPeers);
 		zone = anonymous;
 		gossip.anonymityZone(anonymous);
 		return this;
@@ -1117,7 +1121,9 @@ public final class Node implements AutoCloseable
 
 	/**
 	 * Whether this node connects to addresses it learns from its peers; on by default. Off, it
-	 * stays with the peers it was given and still passes on the addresses it knows.
+	 * stays with the peers it was given and still passes on the addresses it knows. It holds for the
+	 * clearnet and for the anonymity zone alike, whether the zone is set up before or after this
+	 * call: a node told to stay with its peers dials no onion address a zone peer passes on either
 	 *
 	 * @param enabled
 	 *            whether to dial learnt addresses
@@ -1125,8 +1131,25 @@ public final class Node implements AutoCloseable
 	 */
 	public Node discoverPeers(final boolean enabled)
 	{
+		discoversPeers = enabled;
 		discovery.dialling(enabled);
+		AnonymityZone anonymous = zone;
+		if (anonymous != null)
+		{
+			anonymous.discovery().dialling(enabled);
+		}
 		return this;
+	}
+
+	/**
+	 * Onion addresses the anonymity zone has heard of from its peers and not yet been connected to
+	 *
+	 * @return a snapshot, empty without a zone
+	 */
+	List<PeerAddress> anonymousHeardOf()
+	{
+		AnonymityZone anonymous = zone;
+		return anonymous == null ? List.of() : anonymous.discovery().heardOf();
 	}
 
 	/**

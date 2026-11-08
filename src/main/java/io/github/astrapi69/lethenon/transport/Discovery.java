@@ -171,9 +171,15 @@ final class Discovery
 		}
 	}
 
+	/**
+	 * Dials one address, and fills again once it is no longer counted as dialling, unless the node
+	 * had no room: between the slot a dial takes and its leaving {@code dialing} it is counted twice,
+	 * so a fill that ran meanwhile stopped one slot early, and only this fill sees the true count
+	 * (#278). After a failed dial it also takes the next address in place of the forgotten one
+	 */
 	private void dial(final PeerAddress address)
 	{
-		boolean failedToDial = false;
+		boolean noRoom = false;
 		try
 		{
 			dialer.dial(address);
@@ -183,21 +189,20 @@ final class Discovery
 			// this node was full, the address is not at fault: it stays to be dialled when there is room
 			refusals.add(address + ", learnt from a peer, was not dialled, it stays in the book: "
 				+ busy.getMessage());
+			noRoom = true;
 		}
 		catch (IOException failed)
 		{
 			book.forget(address);
 			refusals.add(address + ", learnt from a peer, was not connected: "
 				+ failed.getMessage());
-			failedToDial = true;
 		}
 		finally
 		{
 			dialing.remove(address);
 		}
-		if (failedToDial)
+		if (!noRoom)
 		{
-			// the slot it held is free again; the address is forgotten, so this tries the next
 			fill();
 		}
 	}

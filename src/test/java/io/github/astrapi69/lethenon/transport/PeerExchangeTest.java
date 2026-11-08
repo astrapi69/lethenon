@@ -25,9 +25,9 @@
 package io.github.astrapi69.lethenon.transport;
 
 import static io.github.astrapi69.lethenon.transport.Networks.await;
+import static io.github.astrapi69.lethenon.transport.Networks.connectedInTurn;
 import static io.github.astrapi69.lethenon.transport.Networks.testGenesis;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,9 +41,13 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import io.github.astrapi69.lethenon.Amount;
 import io.github.astrapi69.lethenon.BlockBody;
@@ -134,30 +138,79 @@ class PeerExchangeTest
 		}
 	}
 
-	@Test
+	/**
+	 * The addresses the newcomer learns beyond the ones it has room for: fourteen others, of which
+	 * eleven fill the slots the hub leaves
+	 */
+	private static final int NOT_DIALLED = 3;
+
+	/**
+	 * Whether a node that has only the hub has learnt the hub's addresses: from then on it holds
+	 * another peer, still hears of an address, or has forgotten one with its refusal recorded.
+	 * Before the PEERS answer it has none of these, and would look settled
+	 */
+	private static boolean hasLearnt(final Node node)
+	{
+		return node.peers().size() > 1 || !node.heardOf().isEmpty() || !node.refusals().isEmpty();
+	}
+
+	/**
+	 * Whether a node has stopped dialling: twelve peers, or no address left to dial and no
+	 * handshake open. A learnt address whose dial fails is forgotten (ADR 0003), so a node can end
+	 * below twelve with nothing heard of, under load as well as with an address that refuses (#278)
+	 */
+	private static boolean hasSettled(final Node node)
+	{
+		return node.peers().size() == Node.MAXIMUM_OUTGOING
+			|| node.heardOf().isEmpty() && node.outgoingConnections() == node.peers().size();
+	}
+
+	private static String stateOf(final Node node)
+	{
+		return node.peers().size() + " peers, " + node.outgoingConnections() + " outgoing, heard of "
+			+ node.heardOf() + ", refusals " + node.refusals();
+	}
+
+	static Stream<Arguments> learntAddressesThatRefuse()
+	{
+		return Stream.of(Arguments.of("every learnt address answers", 0),
+			Arguments.of("three learnt addresses refuse", 3));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("learntAddressesThatRefuse")
 	@DisplayName("a node keeps at most twelve outgoing connections however many it learns of")
-	void aNodeKeepsAtMostTwelveOutgoing_howeverManyItLearnsOf() throws IOException
+	void aNodeKeepsAtMostTwelveOutgoing_howeverManyItLearnsOf(final String description,
+		final int refusing) throws IOException
 	{
 		List<Node> others = new ArrayList<>();
 		try (Node hub = Node.on(genesis).discoverPeers(false).keepingLocalAddresses();
 			Node newcomer = Node.on(genesis).keepingLocalAddresses())
 		{
 			int hubPort = hub.listen(0);
-			for (int index = 0; index < Node.MAXIMUM_OUTGOING + 2; index++)
+			others.addAll(connectedInTurn(genesis, hub, hubPort, Node.MAXIMUM_OUTGOING + 2));
+			for (int index = 0; index < refusing; index++)
 			{
-				Node other = Node.on(genesis).discoverPeers(false);
-				others.add(other);
-				other.listen(0);
-				other.connect("127.0.0.1", hubPort);
+				others.get(index).close();
 			}
-			await("every other node at the hub",
-				() -> hub.peers().size() == Node.MAXIMUM_OUTGOING + 2);
+			await("the refusing nodes gone from the hub",
+				() -> hub.peers().size() == Node.MAXIMUM_OUTGOING + 2 - refusing);
 
 			newcomer.connect("127.0.0.1", hubPort);
 
-			await("the newcomer's outgoing connections full",
-				() -> newcomer.peers().size() == Node.MAXIMUM_OUTGOING);
-			assertFalse(newcomer.heardOf().isEmpty(), "the rest stays heard of");
+			await(() -> "the newcomer learnt the hub's addresses; " + stateOf(newcomer),
+				() -> hasLearnt(newcomer));
+			await(() -> "the newcomer settled, twelve peers or nothing left to dial; "
+				+ stateOf(newcomer), () -> hasSettled(newcomer));
+			assertTrue(newcomer.outgoingConnections() <= Node.MAXIMUM_OUTGOING,
+				() -> "more than twelve outgoing; " + stateOf(newcomer));
+			assertTrue(
+				newcomer.heardOf().isEmpty()
+					|| newcomer.peers().size() == Node.MAXIMUM_OUTGOING,
+				() -> "below twelve while an address is still heard of; " + stateOf(newcomer));
+			assertTrue(!newcomer.refusals().isEmpty() || newcomer.heardOf().size() == NOT_DIALLED,
+				() -> "with no dial failed, the addresses beyond the twelve are not all heard of; "
+					+ stateOf(newcomer));
 		}
 		finally
 		{

@@ -51,6 +51,8 @@ public record BlockLimits(String chainIdentifier, long futureMillis, int maximum
 	public static final int MAXIMUM_BLOCK_BYTES = 300_000;
 
 	/**
+	 * The limits, checked before they are used
+	 *
 	 * @throws IllegalArgumentException
 	 *             for a negative limit
 	 */
