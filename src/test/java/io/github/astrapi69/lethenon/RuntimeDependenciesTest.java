@@ -54,22 +54,61 @@ class RuntimeDependenciesTest
 
 	/**
 	 * A pre-release on the class path: a milestone, a release candidate, an alpha, a beta, a preview,
-	 * an early access build or a snapshot, as the jar's name says it
+	 * an early access build, a numbered build such as {@code -b180830.0359} or a snapshot, as the
+	 * jar's name says it
 	 */
-	private static final Pattern PRE_RELEASE = Pattern
-		.compile(".*-\\d[^/]*[-.](M\\d+|[Rr][Cc]\\d*|alpha\\d*|beta\\d*|preview\\d*|ea|SNAPSHOT)\\.jar");
+	private static final Pattern PRE_RELEASE = Pattern.compile(
+		".*-\\d[^/]*[-.](M\\d+|[Rr][Cc]\\d*|alpha\\d*|beta\\d*|preview\\d*|ea|SNAPSHOT|b\\d+(?:\\.\\d+)?)\\.jar");
 
 	/**
-	 * A release ships no pre-release. The family's comparator-extensions 2 brings the milestone
-	 * commons-collections4 4.5.0-M2, through silly-collection 28.2, which mystic-crypt 13.9 and
-	 * crypt-data 13.2 use, and the command line distribution of 0.8.0 shipped it; a dependency
-	 * constraint raises it to 4.6.0 since 0.8.1
+	 * The pre-releases a development version still carries, each with what removes it: jaxb-api
+	 * 2.4.0-b180830.0359, which crypt-data 13.2 brings (crypt-data#133, #301). A release version
+	 * carries none of them, and a development version none but these: the test fails as well when
+	 * one of them is gone, so an entry cannot outlive its cause
+	 */
+	private static final List<String> STILL_ON_A_DEVELOPMENT_VERSION = List
+		.of("jaxb-api-2.4.0-b180830.0359.jar");
+
+	/**
+	 * A release ships no pre-release (the family's rule RL-074). silly-collection 28.2 and
+	 * comparator-extensions 2 bring the milestone commons-collections4 4.5.0-M2, which a dependency
+	 * constraint raises to 4.6.0 since 0.8.1; the numbered build of jaxb-api is still there, which a
+	 * development version tolerates and a release version refuses
 	 */
 	@Test
-	@DisplayName("no pre-release on the class path, commons-collections4 4.5.0-M2 among them")
+	@DisplayName("a release carries no pre-release, a development version only the known ones")
 	void theClassPath_holdsNoPreRelease()
 	{
-		assertEquals(List.of(), preReleases());
+		String version = System.getProperty("lethenon.projectVersion", "");
+		List<String> allowed = version.endsWith("-SNAPSHOT")
+			? STILL_ON_A_DEVELOPMENT_VERSION
+			: List.of();
+
+		assertEquals(allowed, preReleases(), "pre-releases on the class path of " + version);
+	}
+
+	/**
+	 * What the pattern takes for a pre-release, read from the jar's name. jaxb-api 2.4.0-b180830.0359
+	 * is a numbered build of a 2.4.0 that was never released, and crypt-data 13.2 brings it
+	 * (crypt-data#133); the pattern reads that form since #301. Guava's placeholder and the -jre
+	 * flavour of a Guava release are releases
+	 *
+	 * @param jar
+	 *            the name of a jar on a class path
+	 * @param preRelease
+	 *            whether the pattern reads it as a pre-release
+	 */
+	@ParameterizedTest(name = "{0}: pre-release {1}")
+	@CsvSource({ "commons-collections4-4.5.0-M2.jar, true", "jackson-core-2.16.0-rc1.jar, true",
+			"example-3.0.0-beta.jar, true", "example-2.0.0-alpha2.jar, true",
+			"lethenon-0.9.0-SNAPSHOT.jar, true", "jaxb-api-2.4.0-b180830.0359.jar, true",
+			"jaxb-api-2.2.12-b141001.1542.jar, true", "commons-collections4-4.6.0.jar, false",
+			"jaxb-api-2.3.1.jar, false", "guava-33.7.2-jre.jar, false",
+			"listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar, false",
+			"bcprov-jdk18on-1.86.jar, false", "commons-beanutils-1.11.0.jar, false" })
+	void aJarName_isAPreRelease_asThePatternReadsIt(final String jar, final boolean preRelease)
+	{
+		assertEquals(preRelease, PRE_RELEASE.matcher(jar).matches(), jar);
 	}
 
 	private static List<String> preReleases()
