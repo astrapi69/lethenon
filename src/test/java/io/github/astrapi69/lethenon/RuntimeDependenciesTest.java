@@ -72,6 +72,30 @@ class RuntimeDependenciesTest
 		assertEquals(List.of(), preReleases());
 	}
 
+	/**
+	 * What the pattern takes for a pre-release, read from the jar's name. jaxb-api 2.4.0-b180830.0359
+	 * is a numbered build of a 2.4.0 that was never released, and crypt-data 13.2 brings it
+	 * (crypt-data#133); the pattern does not see that form (#301). Guava's placeholder and the -jre
+	 * flavour of a Guava release are releases
+	 *
+	 * @param jar
+	 *            the name of a jar on a class path
+	 * @param preRelease
+	 *            whether the pattern reads it as a pre-release
+	 */
+	@ParameterizedTest(name = "{0}: pre-release {1}")
+	@CsvSource({ "commons-collections4-4.5.0-M2.jar, true", "jackson-core-2.16.0-rc1.jar, true",
+			"example-3.0.0-beta.jar, true", "example-2.0.0-alpha2.jar, true",
+			"lethenon-0.9.0-SNAPSHOT.jar, true", "jaxb-api-2.4.0-b180830.0359.jar, false",
+			"jaxb-api-2.2.12-b141001.1542.jar, false", "commons-collections4-4.6.0.jar, false",
+			"jaxb-api-2.3.1.jar, false", "guava-33.7.2-jre.jar, false",
+			"listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar, false",
+			"bcprov-jdk18on-1.86.jar, false", "commons-beanutils-1.11.0.jar, false" })
+	void aJarName_isAPreRelease_asThePatternReadsIt(final String jar, final boolean preRelease)
+	{
+		assertEquals(preRelease, PRE_RELEASE.matcher(jar).matches(), jar);
+	}
+
 	private static List<String> preReleases()
 	{
 		return Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
