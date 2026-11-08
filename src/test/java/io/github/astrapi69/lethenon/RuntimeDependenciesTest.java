@@ -60,16 +60,16 @@ class RuntimeDependenciesTest
 		.compile(".*-\\d[^/]*[-.](M\\d+|[Rr][Cc]\\d*|alpha\\d*|beta\\d*|preview\\d*|ea|SNAPSHOT)\\.jar");
 
 	/**
-	 * Today the one pre-release on the class path is the milestone commons-collections4 4.5.0-M2.
-	 * The family's comparator-extensions 2 brings it, through silly-collection 28.2, which
-	 * mystic-crypt 13.9 and crypt-data 13.2 use; so the command line distribution of 0.8.0 shipped
-	 * it, and a release ships no pre-release
+	 * A release ships no pre-release. The family's comparator-extensions 2 brings the milestone
+	 * commons-collections4 4.5.0-M2, through silly-collection 28.2, which mystic-crypt 13.9 and
+	 * crypt-data 13.2 use, and the command line distribution of 0.8.0 shipped it; a dependency
+	 * constraint raises it to 4.6.0 since 0.8.1
 	 */
 	@Test
-	@DisplayName("today the only pre-release on the class path is commons-collections4 4.5.0-M2")
-	void theOnlyPreReleaseOnTheClassPath_isTheCollectionsMilestone()
+	@DisplayName("no pre-release on the class path, commons-collections4 4.5.0-M2 among them")
+	void theClassPath_holdsNoPreRelease()
 	{
-		assertEquals(List.of("commons-collections4-4.5.0-M2.jar"), preReleases());
+		assertEquals(List.of(), preReleases());
 	}
 
 	private static List<String> preReleases()
