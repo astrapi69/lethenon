@@ -221,6 +221,29 @@ public final class SeedPhrase
 	}
 
 	/**
+	 * The words of the BIP-39 English word list that start with what is typed, for a program that
+	 * offers them while a word is entered (#305). What is typed is read as {@link #parse} reads a
+	 * word: in any case, without the whitespace, the Unicode space separators and the commas around
+	 * it, and without a number in front of it; nothing typed, or more than one word, gives no word.
+	 * The list is laid out so that the first four letters of a word give that word alone (BIP-39,
+	 * "Wordlist")
+	 *
+	 * @param typed
+	 *            the start of a word as entered
+	 * @return the words that start so, in the order of the list; unmodifiable
+	 */
+	public static List<String> wordsStartingWith(final String typed)
+	{
+		List<String> read = parse(typed);
+		if (read.size() != 1)
+		{
+			return List.of();
+		}
+		String start = read.getFirst();
+		return WORDS.stream().filter(word -> word.startsWith(start)).toList();
+	}
+
+	/**
 	 * The 64 byte seed of BIP-39: PBKDF2-HMAC-SHA512 over the words, salted with "mnemonic" and
 	 * the passphrase, 2048 rounds, both in Unicode NFKD
 	 *

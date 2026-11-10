@@ -29,6 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -265,5 +267,85 @@ class SeedPhraseTest
 		{
 			assertTrue(SeedPhrase.isKnownWord(word), word);
 		}
+	}
+	@Test
+	void wordsStartingWith_givesTheWordsOfTheListThatStartSo_inTheOrderOfTheList()
+	{
+		assertEquals(List.of("act", "action", "actor", "actress", "actual"),
+			SeedPhrase.wordsStartingWith("act"));
+		assertEquals(List.of("zebra", "zero"), SeedPhrase.wordsStartingWith("ze"));
+	}
+
+	/**
+	 * What is typed is read as {@link SeedPhrase#parse} reads a word, so a program can hand over
+	 * a field as the person typed into it
+	 */
+	@ParameterizedTest(name = "{argumentSetName}")
+	@MethodSource("typedStarts")
+	void wordsStartingWith_readsWhatIsTypedAsParseReadsIt(final String typed)
+	{
+		assertEquals(List.of("act", "action", "actor", "actress", "actual"),
+			SeedPhrase.wordsStartingWith(typed));
+	}
+
+	/** The start "act" as it may come out of a field */
+	static Stream<Arguments> typedStarts()
+	{
+		return Stream.of(Arguments.argumentSet("upper case", "ACT"),
+			Arguments.argumentSet("spaces around", "  act "),
+			Arguments.argumentSet("a non-breaking space in front (U+00A0)", "\u00A0act"),
+			Arguments.argumentSet("numbered 3. with a space", "3. act"),
+			Arguments.argumentSet("numbered 3) without a space", "3)act"),
+			Arguments.argumentSet("a comma behind", "act,"));
+	}
+
+	/** Nothing to start from, a start no word has, and two words give no word */
+	@ParameterizedTest(name = "{argumentSetName}")
+	@MethodSource("startsWithoutAWord")
+	void wordsStartingWith_givesNoWord_forNoStartOrMoreThanOne(final String typed)
+	{
+		assertEquals(List.of(), SeedPhrase.wordsStartingWith(typed));
+	}
+
+	static Stream<Arguments> startsWithoutAWord()
+	{
+		return Stream.of(Arguments.argumentSet("nothing typed", ""),
+			Arguments.argumentSet("only spaces", " \t\n"),
+			Arguments.argumentSet("only a number", "12."),
+			Arguments.argumentSet("a start no word has", "qq"),
+			Arguments.argumentSet("a whole word with more behind", "zoom"),
+			Arguments.argumentSet("two words", "act zoo"));
+	}
+
+	/**
+	 * BIP-39 lays its English list out so that the first four letters name one word: every word
+	 * of four letters or more is the only word its first four letters give, and every shorter word
+	 * comes first among the words it starts
+	 */
+	@Test
+	void theFirstFourLettersOfEveryWord_giveThatWordAlone() throws IOException
+	{
+		List<String> list;
+		try (InputStream stream = SeedPhrase.class.getResourceAsStream("bip39-english.txt"))
+		{
+			list = List.of(new String(stream.readAllBytes(), StandardCharsets.UTF_8).split("\n"));
+		}
+		assertEquals(2048, list.size());
+		for (String word : list.stream().filter(listed -> listed.length() >= 4).toList())
+		{
+			assertEquals(List.of(word), SeedPhrase.wordsStartingWith(word.substring(0, 4)), word);
+		}
+		for (String word : list.stream().filter(listed -> listed.length() < 4).toList())
+		{
+			assertEquals(word, SeedPhrase.wordsStartingWith(word).getFirst(), word);
+		}
+	}
+
+	@Test
+	void wordsStartingWith_givesAListNobodyCanChange()
+	{
+		List<String> started = SeedPhrase.wordsStartingWith("act");
+
+		assertThrows(UnsupportedOperationException.class, () -> started.add("zoo"));
 	}
 }
