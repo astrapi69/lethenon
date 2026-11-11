@@ -1,6 +1,18 @@
 ## Change log
 ----------------------
 
+Unreleased
+-------------
+
+- mystic-crypt 13.10 and crypt-data 13.3: the class path carries no pre-release any more. jaxb-api
+  2.4.0-b180830.0359 left with crypt-data#133, silly-collection brings commons-collections4 4.6.0
+  itself, and the dependency constraint of 0.8.1 is gone with its version property (#301)
+- CORRECTION to 0.8.1: its entry says "a release ships no pre-release" and that the command line
+  distribution ships none. Both statements were false: the 0.8.0 and 0.8.1 tar.gz hold
+  `lib/jaxb-api-2.4.0-b180830.0359.jar`, a numbered build of a jaxb-api 2.4.0 that was never
+  released, which crypt-data 13.2 brought to the runtime class path and the pre-release pattern of
+  those releases did not read (#301)
+
 Version 0.8.1
 -------------
 
