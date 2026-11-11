@@ -42,10 +42,7 @@ financial product with real losers, and in the EU it falls under MiCA.
   balance is computed from the chain rather than requested from anybody (`NoBalanceQueryTest`
   fails when the chain package can name a networking type at all)
 - `./gradlew build` prints what ran, including "no test classes" while that is true
-- no attribution to a non-human collaborator: no `Co-Authored-By` trailer for an AI tool or a
-  bot, no commit authored or committed under an AI tool's identity, no session link
-  (`Claude-Session:` trailer or a link into a session) and no "Generated with/by" line, in a commit
-  or a pull request description. Enforced by `scripts/check-commit-provenance.sh` in CI, which also
-  checks the description and checks it again when it is edited, and in `.githooks`
-  (`git config core.hooksPath .githooks`); an exception carries `Co-Author-Exception: <reason>` in
-  the same text (#10, #279)
+- commits and pull requests made with an AI agent may name it (a `Co-Authored-By` trailer, a
+  session link, a "Generated with" line): `AI_USAGE.md` in the profile repository says how the
+  projects are made. The rule that kept such lines out, and its check, were withdrawn by the
+  maintainer on 2026-11-10 (astrapi69/astrapi69#14)
