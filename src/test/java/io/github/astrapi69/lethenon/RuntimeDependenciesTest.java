@@ -61,19 +61,17 @@ class RuntimeDependenciesTest
 		".*-\\d[^/]*[-.](M\\d+|[Rr][Cc]\\d*|alpha\\d*|beta\\d*|preview\\d*|ea|SNAPSHOT|b\\d+(?:\\.\\d+)?)\\.jar");
 
 	/**
-	 * The pre-releases a development version still carries, each with what removes it: jaxb-api
-	 * 2.4.0-b180830.0359, which crypt-data 13.2 brings (crypt-data#133, #301). A release version
-	 * carries none of them, and a development version none but these: the test fails as well when
-	 * one of them is gone, so an entry cannot outlive its cause
+	 * The pre-releases a development version still carries, each with what removes it. Empty since
+	 * crypt-data 13.3: jaxb-api 2.4.0-b180830.0359 left with crypt-data#133 (#301). A release
+	 * version carries none, and a development version none but these: the test fails as well when
+	 * an entry is gone, so an entry cannot outlive its cause
 	 */
-	private static final List<String> STILL_ON_A_DEVELOPMENT_VERSION = List
-		.of("jaxb-api-2.4.0-b180830.0359.jar");
+	private static final List<String> STILL_ON_A_DEVELOPMENT_VERSION = List.of();
 
 	/**
-	 * A release ships no pre-release (the family's rule RL-074). silly-collection 28.2 and
-	 * comparator-extensions 2 bring the milestone commons-collections4 4.5.0-M2, which a dependency
-	 * constraint raises to 4.6.0 since 0.8.1; the numbered build of jaxb-api is still there, which a
-	 * development version tolerates and a release version refuses
+	 * A release ships no pre-release (the family's rule RL-074). Since mystic-crypt 13.10 and
+	 * crypt-data 13.3 the libraries bring commons-collections4 4.6.0 themselves, so the dependency
+	 * constraint of 0.8.1 is gone, and jaxb-api left the class path with crypt-data#133 (#301)
 	 */
 	@Test
 	@DisplayName("a release carries no pre-release, a development version only the known ones")

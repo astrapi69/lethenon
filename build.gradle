@@ -62,16 +62,6 @@ dependencies {
     // a power cut. Not a family library: storage is not what the family offers, and the ADR records
     // why this engine and this binding
     implementation "org.xerial:sqlite-jdbc:$sqliteJdbcVersion"
-    constraints {
-        // a release ships no pre-release: the family's comparator-extensions 2 brings the milestone
-        // 4.5.0-M2, through silly-collection 28.2, which mystic-crypt 13.9 and crypt-data 13.2 use.
-        // 4.6.0 is what silly-collection 29.1 and comparator-extensions 3.1 declare; the constraint
-        // goes once the libraries bring a final release themselves (RuntimeDependenciesTest)
-        implementation("org.apache.commons:commons-collections4:$commonsCollections4Version") {
-            because "the libraries underneath bring the milestone 4.5.0-M2"
-        }
-    }
-
     testImplementation platform("org.junit:junit-bom:$junitVersion")
     testImplementation "org.junit.jupiter:junit-jupiter"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
