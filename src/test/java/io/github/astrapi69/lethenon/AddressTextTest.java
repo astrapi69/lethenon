@@ -144,6 +144,37 @@ class AddressTextTest
 	}
 
 	@Test
+	@DisplayName("every swap of two neighbouring characters that differ is refused; equal neighbours are skipped")
+	void everySwapOfDifferentNeighbours_isRefused()
+	{
+		String text = AddressText.of(ADDRESS, Chain.TEST_IDENTIFIER);
+		List<String> accepted = new ArrayList<>();
+		int tried = 0;
+		int skipped = 0;
+		for (int position = 0; position + 1 < text.length(); position++)
+		{
+			char first = text.charAt(position);
+			char second = text.charAt(position + 1);
+			if (first == second)
+			{
+				// the swap gives the same text back, which is the valid address
+				skipped++;
+				continue;
+			}
+			String swapped = text.substring(0, position) + second + first
+				+ text.substring(position + 2);
+			tried++;
+			if (reads(swapped))
+			{
+				accepted.add(swapped);
+			}
+		}
+		assertEquals(text.length() - 1, tried + skipped);
+		assertTrue(skipped > 0, "the sample has equal neighbours, so the skip is exercised");
+		assertTrue(accepted.isEmpty(), accepted.size() + " of " + tried + " read: " + accepted);
+	}
+
+	@Test
 	@DisplayName("an unknown version is refused with its own message, before the checksum")
 	void anUnknownVersion_isRefusedBeforeTheChecksum()
 	{

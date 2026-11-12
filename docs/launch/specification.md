@@ -78,6 +78,12 @@ Two destination schemes (`AddressScheme`): `direct`, an account key in the clear
 key (`OneTimeAddresses`, `PublishedAddress`, `WalletScan`, `Sweeps`, #21). Evidence:
 `OneTimeAddressesTest`, `StealthFundsCanBeSpentTest`, `WalletScanTest`, `SweepsTest`.
 
+An address is written with its chain and a checksum, `leth1:` or `tleth1:` (`AddressText`,
+[ADR 0007](../adr/0007-address-format.md), #309). Its test vectors, valid and invalid ones with the
+message each gives, on both chains, for a published address and the address of an account, live
+in one file, `src/test/resources/io/github/astrapi69/lethenon/address-vectors.txt`, which
+`AddressVectorsTest` reads. Evidence: `AddressTextTest`, `AddressVectorsTest`, `TypedTextTest`.
+
 Only `stealth-v2` hides a recipient. A `direct` transfer names its recipient in the clear, and so does
 a block: its beneficiary is the miner's Ed25519 spend key (`BlockBody`, `MineCommand`). Under both
 schemes the sender and the amount of every transfer are public.
