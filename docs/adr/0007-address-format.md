@@ -45,7 +45,8 @@ text form of an address can change without a hard fork (`PublishedAddress` Javad
    (`Blocks`, `Bytes`). checksum-up, which the rule names for checksums of bytes, would be a new
    dependency for the same one call; if the maintainer prefers it, that changes nothing else here.
 4. Be the same text in the command line and in the desktop plugin: what one prints, the other takes
-   (#37). Ignore case, and ignore whitespace inside, so a display in groups can be pasted back.
+   (#37). Ignore case and the whitespace listed under Reading, so a display in groups can be
+   pasted back, and read the command line's and the plugin's input through one reader.
 5. Fit a QR code in alphanumeric mode, whose character set is the digits, the upper-case letters,
    the space and `$ % * + - . / :`.
 6. Keep reading the old form.
@@ -94,17 +95,73 @@ The same keys on the test chain end in `:0fc3d2e1` and start with `tleth1:`.
 
 ### Reading
 
-- Case is ignored, and spaces and line breaks inside are dropped before anything is checked.
-- A checksum that does not match is refused with "this address is mistyped or incomplete: its
-  checksum does not match". The reader does not guess which character is wrong.
-- A network that is not the chain of the command is refused, naming both.
-- The old forms, `<view key>:<spend key>` and a bare account key, are still read:
-    - as a recipient on the test chain, with a notice that the address has no checksum;
-    - as an address recorded in a wallet entry, on either chain. mystic-crypt-ui's plugin compares a
-      recorded address with the wallet's by parsing it (`WalletVault.isTheAddressOf`), so an entry
-      written before this change keeps matching.
-- As a recipient on the main chain the old forms are refused: the main chain has not started, so
-  no address was ever handed out for it without a checksum.
+A reader takes these steps in this order and stops at the first that fails, with its own message:
+
+1. **Normalise.** Drop every code point of the list below, wherever it stands, at the start and at
+   the end too. Refuse every other character that is not an ASCII letter, an ASCII digit or `:`,
+   naming its position, counted in code points from 1, and its code point, for example "position
+   17 holds U+200B, and an address holds no such character". This covers invisible characters and
+   direction controls such as U+200B, U+FEFF and U+202E. Then lower-case the ASCII letters.
+2. **Split** at `:`.
+3. **Form.** A first part of `leth` or `tleth` and a number is the new form, anything else is
+   looked at as an old form (below). In the new form:
+    - an unknown version such as `leth2` is refused with "version 2 of the address format is not
+      known here; this build reads version 1";
+    - a published address has 4 parts and a direct recipient 3; another count is refused;
+    - every key is hex of even length, the checksum exactly 8 hex characters.
+4. **Checksum** over the normalised text before the last `:`. A mismatch is refused with "this
+   address is mistyped or incomplete: its checksum does not match". The reader does not guess which
+   character is wrong. Because the checksum comes before the network, a `tleth1` address with its
+   `t` removed reports the checksum, not the network.
+5. **Network.** An address of the other chain than the command's is refused, naming both.
+6. **Keys.** The view key must decode as an X25519 key, the spend key as an Ed25519 key, the
+   account key of a direct recipient as a key of a signature suite.
+
+The code points dropped in step 1, an enumerated list rather than a character class, so that a
+later Unicode version of the Java runtime does not change what an address reader accepts. They are
+exactly the separators `SeedPhrase.parse` reads between words since #286 (on OpenJDK 25 its
+`[\s\p{Z}]` matches these 24 and no other code point), and both readers take them from one list:
+
+| code point | name |
+|---|---|
+| U+0009 | CHARACTER TABULATION |
+| U+000A | LINE FEED (LF) |
+| U+000B | LINE TABULATION |
+| U+000C | FORM FEED (FF) |
+| U+000D | CARRIAGE RETURN (CR) |
+| U+0020 | SPACE |
+| U+00A0 | NO-BREAK SPACE |
+| U+1680 | OGHAM SPACE MARK |
+| U+2000 | EN QUAD |
+| U+2001 | EM QUAD |
+| U+2002 | EN SPACE |
+| U+2003 | EM SPACE |
+| U+2004 | THREE-PER-EM SPACE |
+| U+2005 | FOUR-PER-EM SPACE |
+| U+2006 | SIX-PER-EM SPACE |
+| U+2007 | FIGURE SPACE |
+| U+2008 | PUNCTUATION SPACE |
+| U+2009 | THIN SPACE |
+| U+200A | HAIR SPACE |
+| U+2028 | LINE SEPARATOR |
+| U+2029 | PARAGRAPH SEPARATOR |
+| U+202F | NARROW NO-BREAK SPACE |
+| U+205F | MEDIUM MATHEMATICAL SPACE |
+| U+3000 | IDEOGRAPHIC SPACE |
+
+The checksum is computed over the normalised form, so an address in upper case or grouped with
+spaces has the same checksum as the same address in lower case without them.
+
+The old forms, `<view key>:<spend key>` and a bare account key, pass steps 1 and 2 like the new
+form, have no checksum and no network, and are still read:
+
+- as a recipient on the test chain, with a notice that the address has no checksum;
+- as an address recorded in a wallet entry, on either chain. mystic-crypt-ui's plugin compares a
+  recorded address with the wallet's by parsing it (`WalletVault.isTheAddressOf`), so an entry
+  written before this change keeps matching.
+
+As a recipient on the main chain the old forms are refused: the main chain has not started, so no
+address was ever handed out for it without a checksum.
 
 ### Writing
 
