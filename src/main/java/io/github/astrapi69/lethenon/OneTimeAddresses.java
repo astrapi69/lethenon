@@ -253,7 +253,18 @@ public final class OneTimeAddresses
 			+ " key; there is no stealth construction for the post-quantum suite (#21)");
 	}
 
-	private static PublicKey publicKeyOf(final Bytes encoded, final String algorithm)
+	/**
+	 * Decodes a public key from its X.509 encoding
+	 *
+	 * @param encoded
+	 *            the encoding, as an address or a destination carries it
+	 * @param algorithm
+	 *            the platform's name of the key type, from crypt-api
+	 * @return the key
+	 * @throws IllegalArgumentException
+	 *             when the bytes are no public key of that type
+	 */
+	static PublicKey publicKeyOf(final Bytes encoded, final String algorithm)
 	{
 		try
 		{

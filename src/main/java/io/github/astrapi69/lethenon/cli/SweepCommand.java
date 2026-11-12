@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.github.astrapi69.lethenon.Amount;
+import io.github.astrapi69.lethenon.BlockBody;
 import io.github.astrapi69.lethenon.SignatureSuite;
 import io.github.astrapi69.lethenon.SignedTransaction;
 import io.github.astrapi69.lethenon.Sweeps;
@@ -71,7 +72,8 @@ class SweepCommand extends ChainCommand
 	{
 		Wallet wallet = openWallet();
 		List<SignedTransaction> waiting = new ArrayList<>(readPending());
-		List<SignedTransaction> sweep = Sweeps.prepare(wallet, requireChain(), waiting,
+		List<BlockBody> blocks = requireChain();
+		List<SignedTransaction> sweep = Sweeps.prepare(wallet, blocks, waiting,
 			Amount.parseLeth(fee), memo);
 		if (sweep.isEmpty())
 		{
@@ -87,7 +89,8 @@ class SweepCommand extends ChainCommand
 		waiting.addAll(sweep);
 		writePending(waiting);
 		out.println("signed " + sweep.size() + " transfer" + (sweep.size() == 1 ? "" : "s")
-			+ " sweeping " + total + " LETH onto " + hex(wallet.spendKey(SignatureSuite.ED25519))
+			+ " sweeping " + total + " LETH onto "
+			+ accountText(wallet.spendKey(SignatureSuite.ED25519), chainOf(blocks))
 			+ "; they wait for the next block (" + waiting.size() + " waiting)");
 		out.println("the chain will show those destinations and this account together - that is "
 			+ "what spending a one-time payment costs");

@@ -93,8 +93,8 @@ leth1:302a300506032b656e03210011d330df8c05da43f4eccfb466ee51d1805b3d7b305f7b7aa7
 ```
 
 It is the only example here. The test vectors, valid and invalid ones with the message each must
-give, on both chains, live in one machine-readable file that the tests read; section 5 of the
-specification names it once #309 is built.
+give, on both chains, live in one machine-readable file that the tests read, which section 5 of the
+specification names.
 
 ### Reading
 

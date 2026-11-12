@@ -36,6 +36,10 @@ import java.util.Base64;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import io.github.astrapi69.lethenon.AddressText;
+import io.github.astrapi69.lethenon.Bytes;
+import io.github.astrapi69.lethenon.Chain;
+
 /**
  * Drives the command line the way a shell does - through {@link LethenonCli#execute(String...)}
  * with standard input, output and error swapped for buffers - and keeps what it printed, the same
@@ -44,12 +48,16 @@ import java.util.regex.Pattern;
 abstract class AbstractCliTest
 {
 
-	/** The account line every wallet command prints */
-	protected static final Pattern ACCOUNT = Pattern.compile("account \\(ed25519\\): ([0-9a-f]+)");
+	/**
+	 * The account line on the test chain, which every wallet command and balance print and --to
+	 * takes: the written form of ADR 0007 (#309)
+	 */
+	protected static final Pattern ACCOUNT = Pattern
+		.compile("account \\(ed25519\\)(?:, test chain)?: (tleth1:[0-9a-f]+:[0-9a-f]{8})");
 
-	/** The published address line, which is what another command's --to-address takes (#37) */
-	protected static final Pattern ADDRESS = Pattern
-		.compile("address \\(publish this\\): ([0-9a-f]+:[0-9a-f]+)");
+	/** The published address line on the test chain, what --to-address takes (#37, #309) */
+	protected static final Pattern ADDRESS = Pattern.compile(
+		"address \\(publish this\\)(?:, test chain)?: (tleth1:[0-9a-f]+:[0-9a-f]+:[0-9a-f]{8})");
 
 
 	/** What the last command printed to standard output */
@@ -72,6 +80,18 @@ abstract class AbstractCliTest
 		byte[] bytes = new byte[18];
 		new SecureRandom().nextBytes(bytes);
 		return Base64.getEncoder().encodeToString(bytes);
+	}
+
+	/**
+	 * The key of an account as a command printed it for the test chain
+	 *
+	 * @param written
+	 *            the account in its written form
+	 * @return the account key
+	 */
+	protected static Bytes keyOf(final String written)
+	{
+		return AddressText.account(written, Chain.TEST_IDENTIFIER);
 	}
 
 	protected static String matchIn(final Pattern pattern, final String output)

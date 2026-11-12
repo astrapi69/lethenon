@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 import io.github.astrapi69.mystic.crypt.secret.SecretBuffers;
+import io.github.astrapi69.lethenon.AddressText;
 import io.github.astrapi69.lethenon.BlockBody;
 import io.github.astrapi69.lethenon.Bytes;
 import io.github.astrapi69.lethenon.ChainFile;
@@ -246,15 +247,30 @@ abstract class ChainCommand implements Callable<Integer>
 	}
 
 	/**
-	 * The hex of an account key, as every command prints and takes it
+	 * An account in its written form for a chain, as every command prints it and --to takes it:
+	 * its network, its key and a checksum (ADR 0007, #309)
 	 *
 	 * @param account
 	 *            the account key
-	 * @return its hex
+	 * @param chainIdentifier
+	 *            the chain the account is printed for
+	 * @return the written form
 	 */
-	static String hex(final Bytes account)
+	static String accountText(final Bytes account, final String chainIdentifier)
 	{
-		return account.toString();
+		return AddressText.ofAccount(account, chainIdentifier);
+	}
+
+	/**
+	 * The chain a list of blocks belongs to: the identifier of its genesis block
+	 *
+	 * @param blocks
+	 *            the chain, not empty
+	 * @return the chain identifier
+	 */
+	static String chainOf(final List<BlockBody> blocks)
+	{
+		return blocks.getFirst().chainIdentifier();
 	}
 
 	/**

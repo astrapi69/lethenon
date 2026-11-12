@@ -122,7 +122,8 @@ class MineCommand extends ChainCommand
 		else
 		{
 			out.println("mined block " + mined.height() + " with " + mined.transactions().size()
-				+ " transfer(s), paying " + hex(beneficiary) + ": \"" + mined.pun() + "\""
+				+ " transfer(s), paying " + accountText(beneficiary, mined.chainIdentifier())
+				+ ": \"" + mined.pun() + "\""
 				+ (left.isEmpty() ? "" : "; " + left.size() + " did not fit and wait for the next"));
 		}
 		out.println("chain " + mined.chainIdentifier());

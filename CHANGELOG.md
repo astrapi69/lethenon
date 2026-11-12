@@ -1,6 +1,23 @@
 ## Change log
 ----------------------
 
+Unreleased
+-------------
+
+- An address is written with its chain and a checksum (#309, ADR 0007): `leth1:` or `tleth1:`, the
+  keys as before and 8 hex characters of SHA-256, read through `AddressText` in the order the record
+  fixes - normalise, form, checksum, network, keys - so a mistyped, truncated or garbled address, an
+  unknown version and an address of the other chain are each refused with their own message.
+  Normalising drops 24 listed spaces anywhere, at the start and the end too, and refuses every other
+  character outside ASCII letters, digits and `:` with its position and code point, invisible ones
+  such as U+200B and U+FEFF and direction controls such as U+202E included; the seed phrase reader
+  takes the same 24 from the same list (`TypedText`) and reads exactly what it read before. The
+  command line prints the new form everywhere it prints an account or an address, and `wallet
+  create` and `wallet restore` print both chains' forms. A program on a lethenon from before this
+  change, such as mystic-crypt-ui's plugin before its version bump, refuses the new form; the old
+  forms are still read on the test chain and as a recorded address, and `PublishedAddress.parse`
+  reads both
+
 Version 0.9.0
 -------------
 

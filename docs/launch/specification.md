@@ -87,9 +87,8 @@ post-quantum in its authenticity, classical in its hidden recipient, open about 
 
 ### Written addresses
 
-Decided in [ADR 0007](../adr/0007-address-format.md) and built with #309; until a release carries
-#309, the library writes and reads the old form only, `<view key>:<spend key>` and a bare account
-key.
+Decided in [ADR 0007](../adr/0007-address-format.md) and built with #309 (`AddressText`, the
+spaces in `TypedText`); every command prints this form.
 
 An address is written as `leth1` (main chain) or `tleth1` (test chain), then, each after a `:`, the
 lowercase hex of the X.509 encoding of its keys (the view key and the spend key of a published
@@ -109,6 +108,11 @@ grouped with spaces is that of the same address in lower case.
 
 The old forms are still read as a test chain recipient and as an address recorded in a wallet entry,
 and refused as a main chain recipient.
+
+The test vectors, valid and invalid ones with the message each gives, on both chains, for a
+published address and the address of an account, live in one file,
+`src/test/resources/io/github/astrapi69/lethenon/address-vectors.txt`, which `AddressVectorsTest`
+reads. Evidence: `AddressTextTest`, `AddressVectorsTest`, `TypedTextTest`.
 
 ## 6. Blocks and proof of pun
 

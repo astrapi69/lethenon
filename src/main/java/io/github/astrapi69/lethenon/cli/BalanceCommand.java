@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.List;
 
+import io.github.astrapi69.lethenon.AddressText;
 import io.github.astrapi69.lethenon.BlockBody;
 import io.github.astrapi69.lethenon.Bytes;
 import io.github.astrapi69.lethenon.Replay;
@@ -62,13 +63,14 @@ class BalanceCommand extends ChainCommand
 		List<BlockBody> blocks = requireChain();
 		Replay replay = Replay.verify(blocks);
 		out.println(replay.describe());
+		String chain = chainOf(blocks);
 		for (SignatureSuite suite : SignatureSuite.values())
 		{
 			Bytes account = owner.spendKey(suite);
-			out.println("account (" + suite.identifier() + "): " + hex(account) + " holds "
-				+ replay.finalState().balanceOf(account) + " LETH");
+			out.println("account (" + suite.identifier() + "): " + accountText(account, chain)
+				+ " holds " + replay.finalState().balanceOf(account) + " LETH");
 		}
-		out.println("address (publish this): " + owner.address().toText());
+		out.println("address (publish this): " + AddressText.of(owner.address(), chain));
 		out.println("one-time payments: " + WalletScan
 			.over(blocks, owner.address(), owner.viewKeyPair().getPrivate()).describe());
 		return 0;

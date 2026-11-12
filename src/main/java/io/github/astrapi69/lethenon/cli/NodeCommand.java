@@ -198,7 +198,8 @@ class NodeCommand implements Callable<Integer>
 			out.println("node on " + Chain.TEST_IDENTIFIER + ", listening on "
 				+ node.listeningOn().getHostAddress() + " port " + port + ", "
 				+ configured + ", connecting " + outbound + zone
-				+ (mine ? ", mining for " + ChainCommand.hex(beneficiary) : ""));
+				+ (mine ? ", mining for "
+					+ ChainCommand.accountText(beneficiary, Chain.TEST_IDENTIFIER) : ""));
 			Stop stop = Stop.onShutdown();
 			try
 			{
