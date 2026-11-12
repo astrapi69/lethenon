@@ -48,7 +48,8 @@ text form of an address can change without a hard fork (`PublishedAddress` Javad
    (#37). Ignore case and the whitespace listed under Reading, so a display in groups can be
    pasted back, and read the command line's and the plugin's input through one reader.
 5. Fit a QR code in alphanumeric mode, whose character set is the digits, the upper-case letters,
-   the space and `$ % * + - . / :`.
+   the space and `$ % * + - . / :`, for a published address and a direct Ed25519 recipient. A
+   direct ML-DSA-65 recipient is exchanged as text, not as a QR code (see "QR codes" below).
 6. Keep reading the old form.
 
 ## The options
@@ -168,6 +169,25 @@ address was ever handed out for it without a checksum.
 Every command and the plugin print the new form. A display may group it in fours for comparing it
 with its source; the groups are presentation, not format.
 
+### QR codes
+
+Measured on 2026-11-12 with `io.nayuki:qrcodegen` 1.8.0, the library astrapi69/mystic-crypt-ui#874
+recommends, run outside this repository (it is no dependency of lethenon): addresses built from
+OpenJDK 25 keys in the format above, upper-cased, one alphanumeric segment, the smallest version
+that fits at each error correction level.
+
+| address | characters | L | M | Q | H |
+|---|---|---|---|---|---|
+| published | 192 | version 6 | version 8 | version 10 | version 11 |
+| direct, Ed25519 | 103 | version 4 | version 5 | version 6 | version 8 |
+| direct, ML-DSA-65 | 3,963 | version 39, 173 x 173 modules | does not fit | does not fit | does not fit |
+
+Version 40 holds 4,296 alphanumeric characters at L and 3,391 at M (4,297 and 3,392 were refused).
+In lower case none of the three is alphanumeric, which is why a QR code carries the address in upper
+case. A direct ML-DSA-65 recipient fits only at the lowest error correction, in a code of 173 x 173
+modules that is not practical to scan: it is exchanged as text. The requirement for a QR code holds
+for a published address and a direct Ed25519 recipient.
+
 ## What this does not solve
 
 - **A valid address swapped by malware passes any checksum.** Only comparing it with its source
@@ -187,7 +207,8 @@ with its source; the groups are presentation, not format.
   and every command that prints or reads an address. Section 5 of `docs/launch/specification.md`
   and the change log say what changed.
 - mystic-crypt-ui's plugin takes the format through the library and its QR code
-  (astrapi69/mystic-crypt-ui#874) encodes it in upper case.
+  (astrapi69/mystic-crypt-ui#874) encodes a published address or a direct Ed25519 recipient in upper
+  case; a direct ML-DSA-65 recipient gets no QR code.
 - The tests come first, in the pull request that builds it:
     - a round trip for both kinds of address on both chains;
     - every single substituted character of a fixed sample address is refused, every position
