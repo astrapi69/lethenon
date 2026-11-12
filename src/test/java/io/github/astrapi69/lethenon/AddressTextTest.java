@@ -35,6 +35,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -295,6 +296,129 @@ class AddressTextTest
 
 		assertEquals("no address form for the chain 'lethenon-1': this build writes addresses of "
 			+ "lethenon-2 and lethenon-test-2", refused.getMessage());
+	}
+
+	@Test
+	@DisplayName("every space of the list is dropped at the start, inside and at the end, for both kinds")
+	void everySpaceOfTheList_isDroppedAnywhere()
+	{
+		List<String> refused = new ArrayList<>();
+		for (int space : TypedText.SPACES)
+		{
+			String character = Character.toString(space);
+			for (String written : List.of(AddressText.of(ADDRESS, Chain.TEST_IDENTIFIER),
+				AddressText.ofAccount(ACCOUNT, Chain.TEST_IDENTIFIER)))
+			{
+				for (String text : List.of(character + written,
+					written.substring(0, 20) + character + written.substring(20),
+					written + character))
+				{
+					if (!readsAs(written, text))
+					{
+						refused.add(String.format("U+%04X in %s", space, text));
+					}
+				}
+			}
+		}
+		assertTrue(refused.isEmpty(), refused.toString());
+	}
+
+	@Test
+	@DisplayName("upper case, groups of four, tabs, CRLF and spaces around read as the lower case form, with its checksum")
+	void theUsualWaysOfWritingItDown_readAsTheLowerCaseForm()
+	{
+		for (String written : List.of(AddressText.of(ADDRESS, Chain.TEST_IDENTIFIER),
+			AddressText.ofAccount(ACCOUNT, Chain.TEST_IDENTIFIER),
+			AddressText.of(ADDRESS, Chain.IDENTIFIER),
+			AddressText.ofAccount(ACCOUNT, Chain.IDENTIFIER)))
+		{
+			StringBuilder grouped = new StringBuilder();
+			for (int start = 0; start < written.length(); start += 4)
+			{
+				grouped.append(written, start, Math.min(start + 4, written.length())).append(' ');
+			}
+			for (String text : List.of(written.toUpperCase(Locale.ROOT),
+				grouped.toString(), written.substring(0, 30) + "\t" + written.substring(30),
+				written.substring(0, 50) + "\r\n" + written.substring(50),
+				"  \t" + written + "\r\n", "\n" + grouped.toString().toUpperCase(Locale.ROOT)))
+			{
+				assertTrue(readsAs(written, text), text);
+			}
+		}
+	}
+
+	@ParameterizedTest(name = "code point {0} (decimal) is refused with its position")
+	@ValueSource(ints = { 0x200B, 0xFEFF, 0x202E })
+	@DisplayName("an invisible character or a direction control is refused, naming its position and code point")
+	void anInvisibleCharacter_isRefusedWithItsPositionAndCodePoint(final int codePoint)
+	{
+		String written = AddressText.of(ADDRESS, Chain.TEST_IDENTIFIER);
+		for (int index : List.of(0, 17, written.length()))
+		{
+			String text = written.substring(0, index) + Character.toString(codePoint)
+				+ written.substring(index);
+
+			IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
+				() -> AddressText.published(text, Chain.TEST_IDENTIFIER));
+
+			assertEquals(String.format("position %d holds U+%04X, and an address holds no such "
+				+ "character", index + 1, codePoint), refused.getMessage());
+		}
+	}
+
+	@Test
+	@DisplayName("a character outside the plane of most text is counted as one position")
+	void aCharacterOutsideTheBasicPlane_isOnePosition()
+	{
+		String text = "\uD83D\uDE00" + "\u200B" + AddressText.of(ADDRESS, Chain.TEST_IDENTIFIER);
+
+		IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
+			() -> AddressText.published(text, Chain.TEST_IDENTIFIER));
+
+		assertEquals("position 1 holds U+1F600, and an address holds no such character",
+			refused.getMessage());
+	}
+
+	@Test
+	@DisplayName("text that is only spaces is no address")
+	void onlySpaces_isNoAddress()
+	{
+		IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
+			() -> AddressText.account(" \t\r\n\u00A0", Chain.TEST_IDENTIFIER));
+
+		assertEquals("an address was expected, and the text is empty", refused.getMessage());
+	}
+
+	@Test
+	@DisplayName("a recorded address and PublishedAddress.parse normalise as the recipient readers do")
+	void theRecordedReader_normalisesTheSameWay()
+	{
+		String grouped = " " + AddressText.of(ADDRESS, Chain.IDENTIFIER).toUpperCase(Locale.ROOT)
+			.replace(":", " : ") + "\n";
+
+		assertEquals(ADDRESS, AddressText.recorded(grouped));
+		assertEquals(ADDRESS, PublishedAddress.parse(grouped));
+	}
+
+	/**
+	 * Whether a text reads as the given written form: the same keys, and written again the same
+	 * text, so the checksum it was checked against is that of the lower case form
+	 */
+	private static boolean readsAs(final String written, final String text)
+	{
+		String chain = written.startsWith("t") ? Chain.TEST_IDENTIFIER : Chain.IDENTIFIER;
+		try
+		{
+			if (written.split(":").length == 4)
+			{
+				return AddressText.of(AddressText.published(text, chain), chain).equals(written);
+			}
+			return AddressText.ofAccount(AddressText.account(text, chain), chain).equals(written);
+		}
+		catch (IllegalArgumentException refused)
+		{
+			return false;
+		}
 	}
 
 	private static void assertRefused(final String message, final String text)

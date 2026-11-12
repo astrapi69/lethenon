@@ -28,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -45,8 +46,10 @@ import io.github.astrapi69.crypt.data.hash.HashExtensions;
  * </pre>
  * <p>
  * A reader takes the steps of the record in its order and stops at the first that fails, each
- * with its own message: split at {@code :}, the form (the prefix, a known version, the number of
- * parts, keys in hex of even length), the checksum, the network, the keys. The command line and
+ * with its own message: normalise (drop the spaces of {@link TypedText#SPACES}, refuse any other
+ * character outside ASCII letters, digits and {@code :}, lower-case), split at {@code :}, the form
+ * (the prefix, a known version, the number of parts, keys in hex of even length), the checksum,
+ * the network, the keys. The published and the account reader normalise through the same step. The command line and
  * the desktop plugin read through these methods, so what one prints the other takes (#37).
  * <p>
  * The old forms, {@code <view key>:<spend key>} and a bare account key, have neither a checksum
@@ -182,11 +185,51 @@ public final class AddressText
 	 */
 	public static boolean hasNoChecksum(final String text)
 	{
-		return !PREFIX.matcher(text.split(SEPARATOR, -1)[0]).matches();
+		StringBuilder first = new StringBuilder();
+		text.codePoints().filter(codePoint -> !TypedText.isSpace(codePoint))
+			.takeWhile(codePoint -> codePoint != SEPARATOR.charAt(0))
+			.forEach(codePoint -> first.appendCodePoint(Character.toLowerCase(codePoint)));
+		return !PREFIX.matcher(first).matches();
 	}
 
-	private static Written read(final String text, final Kind expected)
+	/**
+	 * Step 1 of reading: drops the spaces of {@link TypedText#SPACES} wherever they stand and
+	 * lower-cases the ASCII letters, refusing every other character that is not an ASCII letter, an
+	 * ASCII digit or the separator, with its position, counted in code points from 1, and its code
+	 * point
+	 *
+	 * @param text
+	 *            the address as given
+	 * @return the normalised text, over which the checksum is computed
+	 */
+	static String normalised(final String text)
 	{
+		StringBuilder kept = new StringBuilder(text.length());
+		int position = 0;
+		for (int index = 0; index < text.length();)
+		{
+			int codePoint = text.codePointAt(index);
+			index += Character.charCount(codePoint);
+			position++;
+			if (TypedText.isSpace(codePoint))
+			{
+				continue;
+			}
+			boolean asciiLetterOrDigit = codePoint < 0x80 && Character.isLetterOrDigit(codePoint);
+			if (!asciiLetterOrDigit && codePoint != SEPARATOR.charAt(0))
+			{
+				throw new IllegalArgumentException(String.format(Locale.ROOT,
+					"position %d holds U+%04X, and an address holds no such character", position,
+					codePoint));
+			}
+			kept.append(Character.toLowerCase((char)codePoint));
+		}
+		return kept.toString();
+	}
+
+	private static Written read(final String given, final Kind expected)
+	{
+		String text = normalised(given);
 		if (text.isEmpty())
 		{
 			throw new IllegalArgumentException("an address was expected, and the text is empty");

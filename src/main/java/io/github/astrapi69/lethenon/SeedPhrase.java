@@ -77,8 +77,13 @@ public final class SeedPhrase
 
 	private static final int BITS_PER_WORD = 11;
 
-	/** What stands between the words of a phrase: whitespace, any Unicode space separator, commas */
-	private static final Pattern SEPARATORS = Pattern.compile("[\\s\\p{Z},]+");
+	/**
+	 * What stands between the words of a phrase: the spaces of {@link TypedText#SPACES}, which
+	 * addresses drop as well, and commas. Until #309 this was {@code [\\s\\p{Z},]+}; the list is
+	 * exactly what that matched on OpenJDK 25 ({@code TypedTextTest})
+	 */
+	private static final Pattern SEPARATORS = Pattern
+		.compile("[" + TypedText.asCharacterClass() + ",]+");
 
 	/** A number in front of a word, as a backup sheet numbers the words */
 	private static final Pattern NUMBERING = Pattern.compile("^\\d+[.):]?");
