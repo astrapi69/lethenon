@@ -1,0 +1,22 @@
+// The manifest names what was built and with which tools, and nothing that changes between two builds of
+// the same commit: no build time, no operating system, no JDK patch level (family standard, crypt-data#139,
+// wording after silly-bean#24). The feature release stays as Build-Jdk-Spec, the attribute Maven writes for
+// the same reason.
+jar {
+    manifest {
+        attributes(
+                "Name": project.name,
+                "Manifest-Version": project.version,
+                "Implementation-Title": "$groupPackage" + "." + "$rootProject.name",
+                "Implementation-Version": project.version,
+                "Created-By": "Gradle ${gradle.gradleVersion}",
+                "Build-Jdk-Spec": java.toolchain.languageVersion.get().toString())
+    }
+}
+
+// Every archive has fixed entry times and a fixed entry order, so that it depends on the files alone.
+// Gradle 9 does this by default; stated here so the build does not depend on that default (silly-bean#24).
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
