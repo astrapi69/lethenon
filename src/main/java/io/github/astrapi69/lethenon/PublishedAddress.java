@@ -52,7 +52,10 @@ public record PublishedAddress(Bytes viewKey, Bytes spendKey)
 	public static final String SEPARATOR = ":";
 
 	/**
-	 * The address as one line of text: the view key, a separator, the spend key, both in hex.
+	 * The address in the old form, without a network and a checksum: the view key, a separator, the
+	 * spend key, both in hex. What a person is handed is the written form of ADR 0007,
+	 * {@link AddressText#of(PublishedAddress, String)} (#309); this one stays for the readers of
+	 * the old form.
 	 * <p>
 	 * An address travels out of band, so it has to survive being written down, pasted into a
 	 * message and typed back in - and what one command prints has to be what another command takes
@@ -66,20 +69,31 @@ public record PublishedAddress(Bytes viewKey, Bytes spendKey)
 	}
 
 	/**
-	 * Reads an address from its text form.
+	 * Reads an address from its text form, the written form of ADR 0007 or the old one.
 	 * <p>
-	 * Only the SHAPE is checked here - two hexadecimal halves - not whether the halves are keys on
-	 * their curves. That answer comes from the one call that needs it, with the key in the message,
-	 * rather than from a constructor that would have to guess which curve was meant.
+	 * The written form, {@code leth1:} or {@code tleth1:} with its checksum, is read as
+	 * {@link AddressText#recorded(String)} reads it: for either chain, the checksum and the keys
+	 * checked (#309). A reader that pays an address on a known chain takes
+	 * {@link AddressText#published(String, String)} instead, which also checks the network.
+	 * <p>
+	 * Of the old form only the SHAPE is checked here - two hexadecimal halves - not whether the
+	 * halves are keys on their curves. That answer comes from the one call that needs it, with the
+	 * key in the message, rather than from a constructor that would have to guess which curve was
+	 * meant.
 	 *
 	 * @param text
-	 *            the address as {@link #toText()} wrote it
+	 *            the address as {@link AddressText#of(PublishedAddress, String)} or
+	 *            {@link #toText()} wrote it
 	 * @return the address
 	 * @throws IllegalArgumentException
-	 *             when the text is not two hexadecimal halves separated by {@link #SEPARATOR}
+	 *             when the text is neither form, or the written form fails a step of its reading
 	 */
 	public static PublishedAddress parse(final String text)
 	{
+		if (!AddressText.hasNoChecksum(text))
+		{
+			return AddressText.recorded(text);
+		}
 		String[] halves = text.split(SEPARATOR, -1);
 		if (halves.length != 2 || halves[0].isEmpty() || halves[1].isEmpty())
 		{

@@ -4,6 +4,15 @@
 Unreleased
 -------------
 
+- An address is written with its chain and a checksum (#309, ADR 0007): `leth1:` or `tleth1:`,
+  the keys as before and 8 hex characters of SHA-256, read through `AddressText` in the order the
+  record fixes - form, checksum, network, keys - so a mistyped, truncated or garbled address, an
+  unknown version and an address of the other chain are each refused with their own message. The
+  command line prints the new form everywhere it prints an account or an address, and
+  `wallet create` and `wallet restore` print both chains' forms. A program on a lethenon from before
+  this change, such as mystic-crypt-ui's plugin before its version bump, refuses the new form; the
+  old forms are still read on the test chain and as a recorded address, and
+  `PublishedAddress.parse` reads both
 - mystic-crypt 13.10 and crypt-data 13.3: the class path carries no pre-release any more. jaxb-api
   2.4.0-b180830.0359 left with crypt-data#133, silly-collection brings commons-collections4 4.6.0
   itself, and the dependency constraint of 0.8.1 is gone with its version property (#301)

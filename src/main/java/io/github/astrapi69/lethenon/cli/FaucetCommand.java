@@ -74,7 +74,8 @@ class FaucetCommand extends TransferCommand
 		if (!firstMiner.equals(holder.spendKey(SignatureSuite.ED25519)))
 		{
 			throw new IllegalArgumentException("the faucet pays from the first miner's account "
-				+ hex(firstMiner) + ", and this wallet is not that account");
+				+ accountText(firstMiner, chainOf(blocks))
+				+ ", and this wallet is not that account");
 		}
 		return transfer(out, holder, blocks, amountOf(AMOUNT_TEXT), "from the faucet");
 	}

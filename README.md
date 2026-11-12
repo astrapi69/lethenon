@@ -47,17 +47,23 @@ file, which anybody can replay, and a wallet file, which only its password opens
 never an argument; it is the first line of standard input.
 
 ```
-lethenon wallet create  --wallet holder.wallet          # prints the account and the 24 words
+lethenon wallet create  --wallet holder.wallet          # prints the account, the address and the 24 words
 lethenon wallet restore --wallet again.wallet           # stdin: the 24 words, then a new password
 lethenon mine    --testnet --chain test.lethenon --wallet holder.wallet   # block 0 of a test chain, its reward burned
 lethenon mine    --chain test.lethenon --wallet holder.wallet   # block 1, paying this wallet
 lethenon faucet  --chain test.lethenon --wallet holder.wallet --to <account>   # 1,000 LETH from the wallet block 1 paid
 lethenon send    --chain chain.lethenon --wallet w.wallet --to <account> --amount 12.5 --memo "..."
-lethenon send    --chain chain.lethenon --wallet w.wallet --to-address <view:spend> --amount 12.5
+lethenon send    --chain chain.lethenon --wallet w.wallet --to-address <address> --amount 12.5
 lethenon sweep   --chain chain.lethenon --wallet w.wallet       # one-time payments onto the account
 lethenon balance --chain chain.lethenon --wallet w.wallet       # replays the chain, asks nobody
 lethenon export  --chain chain.lethenon --to old.lethenon       # the chain as 0.5.0 reads it, waiting transfers too
 ```
+
+An account and a published address are written with their chain and a checksum, `tleth1:` on the
+test chain and `leth1:` on the main chain ([ADR 0007](docs/adr/0007-address-format.md)): a
+mistyped or truncated one is refused before anything is signed, and one of the other chain too.
+`wallet create` prints both forms of each, because a wallet has the same keys on both chains; the
+old forms without a checksum are still taken on the test chain, with a notice.
 
 `--to` names an account and the chain shows who was paid; `--to-address` names the published
 address that `wallet create` and `balance` print, and the transfer then goes to a one-time

@@ -27,9 +27,13 @@ package io.github.astrapi69.lethenon.cli;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 import io.github.astrapi69.mystic.crypt.secret.SecretBuffers;
+import io.github.astrapi69.lethenon.AddressText;
+import io.github.astrapi69.lethenon.Bytes;
+import io.github.astrapi69.lethenon.Chain;
 import io.github.astrapi69.lethenon.SignatureSuite;
 import io.github.astrapi69.lethenon.Wallet;
 import io.github.astrapi69.lethenon.WalletFile;
@@ -113,10 +117,7 @@ class WalletCommand
 				SecretBuffers.wipe(password);
 			}
 			System.out.println("wallet written to " + wallet);
-			System.out.println(
-				"account (ed25519): " + ChainCommand.hex(created.spendKey(SignatureSuite.ED25519)));
-			// what a payer needs in order to pay unlinkably, in the form --to-address takes (#37)
-			System.out.println("address (publish this): " + created.address().toText());
+			printAddresses(created);
 		}
 	}
 
@@ -150,9 +151,7 @@ class WalletCommand
 					.nextLineOfStandardInput(input, "the new wallet's password").toCharArray();
 				write(restored, password);
 				System.out.println("wallet restored to " + wallet);
-				System.out.println("account (ed25519): "
-					+ ChainCommand.hex(restored.spendKey(SignatureSuite.ED25519)));
-				System.out.println("address (publish this): " + restored.address().toText());
+				printAddresses(restored);
 				return 0;
 			}
 			catch (IllegalArgumentException | IOException refused)
@@ -183,6 +182,31 @@ class WalletCommand
 			{
 				SecretBuffers.wipe(password);
 			}
+		}
+	}
+
+	/**
+	 * Prints the account and the published address of a wallet for both chains, in the form --to
+	 * and --to-address take (#37): the keys of a wallet are the same on both, and only the network
+	 * and the checksum of the written form tell them apart (ADR 0007, #309)
+	 *
+	 * @param wallet
+	 *            the wallet
+	 */
+	static void printAddresses(final Wallet wallet)
+	{
+		Bytes account = wallet.spendKey(SignatureSuite.ED25519);
+		for (String chain : List.of(Chain.TEST_IDENTIFIER, Chain.IDENTIFIER))
+		{
+			String name = Chain.IDENTIFIER.equals(chain) ? "main chain" : "test chain";
+			System.out.println("account (ed25519), " + name + ": "
+				+ ChainCommand.accountText(account, chain));
+		}
+		for (String chain : List.of(Chain.TEST_IDENTIFIER, Chain.IDENTIFIER))
+		{
+			String name = Chain.IDENTIFIER.equals(chain) ? "main chain" : "test chain";
+			System.out.println("address (publish this), " + name + ": "
+				+ AddressText.of(wallet.address(), chain));
 		}
 	}
 }

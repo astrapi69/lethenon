@@ -29,9 +29,11 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.github.astrapi69.lethenon.AddressText;
 import io.github.astrapi69.lethenon.Amount;
 import io.github.astrapi69.lethenon.BlockBody;
 import io.github.astrapi69.lethenon.Bytes;
+import io.github.astrapi69.lethenon.Chain;
 import io.github.astrapi69.lethenon.Destination;
 import io.github.astrapi69.lethenon.OneTimeAddresses;
 import io.github.astrapi69.lethenon.PublishedAddress;
@@ -56,14 +58,17 @@ abstract class TransferCommand extends ChainCommand
 {
 
 	@Option(names = "--to",
-		description = "the recipient's account key, in hex, as every command prints it; the "
-			+ "transparent case - the chain shows who was paid")
+		description = "the recipient's account, as 'wallet create' and 'balance' print it: "
+			+ "tleth1: or leth1:, the key and a checksum; on the test chain also the bare key in "
+			+ "hex, which has no checksum. The transparent case - the chain shows who was paid")
 	String recipient;
 
 	@Option(names = "--to-address",
 		description = "the recipient's published address, as 'wallet create' and 'balance' print "
-			+ "it (view:spend in hex). The transfer then goes to a one-time destination derived "
-			+ "from it, and two payments to the same address have nothing visibly in common")
+			+ "it: tleth1: or leth1:, the view key, the spend key and a checksum; on the test "
+			+ "chain also the old view:spend in hex. The transfer then goes to a one-time "
+			+ "destination derived from it, and two payments to the same address have nothing "
+			+ "visibly in common")
 	String recipientAddress;
 
 	@Option(names = "--fee", defaultValue = "0",
@@ -108,9 +113,11 @@ abstract class TransferCommand extends ChainCommand
 		final Amount amount, final String memo) throws IOException
 	{
 		List<SignedTransaction> waiting = new ArrayList<>(readPending());
+		String chainIdentifier = chainOf(blocks);
+		Recipient to = recipient(chainIdentifier);
 		SignedTransaction signed = Transfers.prepare(sender, SignatureSuite.withIdentifier(suite),
-			blocks, waiting, destination(), amount, amountOf(fee), memo);
-		String signedLine = "signed a transfer of " + amount + " LETH to " + whomItNames()
+			blocks, waiting, to.destination(), amount, amountOf(fee), memo);
+		String signedLine = "signed a transfer of " + amount + " LETH to " + to.named()
 			+ " with nonce " + signed.body().nonce();
 		if (node != null)
 		{
@@ -149,36 +156,54 @@ abstract class TransferCommand extends ChainCommand
 
 	/**
 	 * Where the money goes: a transparent account, or a one-time destination derived from a
-	 * published address. Exactly one of the two options says so - a transfer that names both
-	 * leaves which one wins to the reader, and one that names neither has no recipient at all.
+	 * published address, each read as ADR 0007 reads it, for the chain of the transfer (#309).
+	 * Exactly one of the two options says so - a transfer that names both leaves which one wins to
+	 * the reader, and one that names neither has no recipient at all. An old form without a
+	 * checksum is taken on the test chain, and the command says that a typing mistake in it would
+	 * not have been noticed.
 	 */
-	private Destination destination()
+	private Recipient recipient(final String chainIdentifier)
 	{
 		boolean hasKey = recipient != null && !recipient.isBlank();
 		boolean hasAddress = recipientAddress != null && !recipientAddress.isBlank();
 		if (hasKey == hasAddress)
 		{
-			throw new IllegalArgumentException("name the recipient once: --to for an account key, "
+			throw new IllegalArgumentException("name the recipient once: --to for an account, "
 				+ "or --to-address for a published address");
+		}
+		String given = hasKey ? recipient : recipientAddress;
+		if (AddressText.hasNoChecksum(given) && !Chain.IDENTIFIER.equals(chainIdentifier))
+		{
+			System.err.println("this address has no checksum, so a typing mistake in it would "
+				+ "not have been noticed; ask for its " + AddressText.prefixFor(chainIdentifier)
+				+ AddressText.SEPARATOR + " form");
 		}
 		if (hasKey)
 		{
-			return Destination.direct(Bytes.ofHex(recipient));
+			Bytes account = AddressText.account(recipient, chainIdentifier);
+			// a direct transfer names its recipient in the clear anyway, so printing it costs nothing
+			return new Recipient(Destination.direct(account),
+				AddressText.ofAccount(account, chainIdentifier));
 		}
-		return OneTimeAddresses.destinationFor(PublishedAddress.parse(recipientAddress),
-			OneTimeAddresses.newEphemeralKeyPair());
+		PublishedAddress address = AddressText.published(recipientAddress, chainIdentifier);
+		// a published address is NOT printed as the destination it produced: the point of a
+		// one-time destination is that nobody but the recipient can connect the two, and a
+		// sender's own terminal is a place where that connection would be written down
+		return new Recipient(
+			OneTimeAddresses.destinationFor(address, OneTimeAddresses.newEphemeralKeyPair()),
+			"a one-time destination of " + AddressText.of(address, chainIdentifier));
 	}
 
 	/**
-	 * What the line printed afterwards says the money went to. A published address is NOT printed
-	 * as the destination it produced: the point of a one-time destination is that nobody but the
-	 * recipient can connect the two, and a sender's own terminal is a place where that connection
-	 * would be written down.
+	 * The recipient of a transfer and how the line printed afterwards names it
+	 *
+	 * @param destination
+	 *            where the money goes
+	 * @param named
+	 *            what the printed line says it went to
 	 */
-	private String whomItNames()
+	private record Recipient(Destination destination, String named)
 	{
-		return recipient != null && !recipient.isBlank() ? recipient
-			: "a one-time destination of " + recipientAddress;
 	}
 
 	/**

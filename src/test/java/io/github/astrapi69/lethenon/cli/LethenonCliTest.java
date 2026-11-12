@@ -149,8 +149,8 @@ class LethenonCliTest extends AbstractCliTest
 			minerWallet), err);
 
 		List<BlockBody> blocks = new ChainFile(chain).read();
-		assertEquals(List.of(Genesis.NOBODY.toString(), holderAccount, minerAccount),
-			blocks.stream().map(block -> block.beneficiary().toString()).toList());
+		assertEquals(List.of(Genesis.NOBODY, keyOf(holderAccount), keyOf(minerAccount)),
+			blocks.stream().map(BlockBody::beneficiary).toList());
 		assertTrue(out.contains("mined block 2"), out);
 	}
 

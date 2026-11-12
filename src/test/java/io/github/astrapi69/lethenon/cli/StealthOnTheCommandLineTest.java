@@ -36,7 +36,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.github.astrapi69.lethenon.Amount;
-import io.github.astrapi69.lethenon.Bytes;
 import io.github.astrapi69.lethenon.ChainFile;
 import io.github.astrapi69.lethenon.PublishedAddress;
 import io.github.astrapi69.lethenon.Replay;
@@ -101,7 +100,7 @@ class StealthOnTheCommandLineTest extends AbstractCliTest
 
 		Replay replay = Replay.verify(new ChainFile(chain).read());
 
-		assertEquals(Amount.ofLeth(20L), replay.finalState().balanceOf(Bytes.ofHex(payeeAccount)),
+		assertEquals(Amount.ofLeth(20L), replay.finalState().balanceOf(keyOf(payeeAccount)),
 			"the money reached the account the recipient can spend from: " + replay.describe());
 		assertEquals(2L, replay.transactions(), "two transfers: the payment to the one-time "
 			+ "destination, and the sweep out of it - " + replay.describe());
@@ -120,7 +119,7 @@ class StealthOnTheCommandLineTest extends AbstractCliTest
 
 		PublishedAddress parsed = PublishedAddress.parse(address);
 
-		assertEquals(account, parsed.spendKey().toString(),
+		assertEquals(keyOf(account), parsed.spendKey(),
 			"the address carries the account's own signing key as its spend half");
 		assertNotEquals(parsed.spendKey(), parsed.viewKey());
 	}
