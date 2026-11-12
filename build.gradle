@@ -161,5 +161,6 @@ tasks.register('writeChainFixtures', JavaExec) {
     args layout.projectDirectory.dir('src/test/resources/chain').asFile.path
 }
 
+apply from: "gradle/packaging.gradle"
 apply from: "gradle/publishing.gradle"
 apply from: "gradle/distribution.gradle"

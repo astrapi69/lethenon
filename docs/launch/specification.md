@@ -78,18 +78,41 @@ Two destination schemes (`AddressScheme`): `direct`, an account key in the clear
 key (`OneTimeAddresses`, `PublishedAddress`, `WalletScan`, `Sweeps`, #21). Evidence:
 `OneTimeAddressesTest`, `StealthFundsCanBeSpentTest`, `WalletScanTest`, `SweepsTest`.
 
-An address is written with its chain and a checksum, `leth1:` or `tleth1:` (`AddressText`,
-[ADR 0007](../adr/0007-address-format.md), #309). Its test vectors, valid and invalid ones with the
-message each gives, on both chains, for a published address and the address of an account, live
-in one file, `src/test/resources/io/github/astrapi69/lethenon/address-vectors.txt`, which
-`AddressVectorsTest` reads. Evidence: `AddressTextTest`, `AddressVectorsTest`, `TypedTextTest`.
-
 Only `stealth-v2` hides a recipient. A `direct` transfer names its recipient in the clear, and so does
 a block: its beneficiary is the miner's Ed25519 spend key (`BlockBody`, `MineCommand`). Under both
 schemes the sender and the amount of every transfer are public.
 
 What this hides and what it does not is stated in the README, "Privacy, and its honest label":
 post-quantum in its authenticity, classical in its hidden recipient, open about sender and amount.
+
+### Written addresses
+
+Decided in [ADR 0007](../adr/0007-address-format.md) and built with #309 (`AddressText`, the
+spaces in `TypedText`); every command prints this form.
+
+An address is written as `leth1` (main chain) or `tleth1` (test chain), then, each after a `:`, the
+lowercase hex of the X.509 encoding of its keys (the view key and the spend key of a published
+address, the account key of a direct recipient), and last a `:` and 8 hex characters: the first 4
+bytes of SHA-256 over the normalised text before the last `:`.
+
+A reader takes these steps in this order and stops at the first that fails: normalise, split at
+`:`, form (the number of parts, the prefix, a known version, keys in hex of even length), checksum,
+network, decode the keys. An unknown version such as `leth2` is refused before the checksum with a
+message of its own. Normalising drops these 24 code points wherever they stand, at the start and
+the end too: U+0009, U+000A, U+000B, U+000C, U+000D, U+0020, U+00A0, U+1680, U+2000, U+2001,
+U+2002, U+2003, U+2004, U+2005, U+2006, U+2007, U+2008, U+2009, U+200A, U+2028, U+2029, U+202F,
+U+205F and U+3000 - the separators the seed phrase reader reads between words (#286). Every other
+character that is not an ASCII letter, an ASCII digit or `:` is refused with its position and its
+code point; then the letters are lower-cased, so the checksum of an address in upper case or
+grouped with spaces is that of the same address in lower case.
+
+The old forms are still read as a test chain recipient and as an address recorded in a wallet entry,
+and refused as a main chain recipient.
+
+The test vectors, valid and invalid ones with the message each gives, on both chains, for a
+published address and the address of an account, live in one file,
+`src/test/resources/io/github/astrapi69/lethenon/address-vectors.txt`, which `AddressVectorsTest`
+reads. Evidence: `AddressTextTest`, `AddressVectorsTest`, `TypedTextTest`.
 
 ## 6. Blocks and proof of pun
 

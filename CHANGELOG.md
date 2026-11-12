@@ -4,28 +4,58 @@
 Unreleased
 -------------
 
-- An address is written with its chain and a checksum (#309, ADR 0007): `leth1:` or `tleth1:`,
-  the keys as before and 8 hex characters of SHA-256, read through `AddressText` in the order the
-  record fixes - normalise, form, checksum, network, keys - so a mistyped, truncated or garbled
-  address, an unknown version and an address of the other chain are each refused with their own
-  message. Normalising drops 24 listed spaces anywhere, at the start and the end too, and refuses
-  every other character outside ASCII letters, digits and `:` with its position and code point,
-  invisible ones such as U+200B and U+FEFF and direction controls such as U+202E included; the seed
-  phrase reader takes the same 24 from the same list (`TypedText`) and reads exactly what it read
-  before. The
-  command line prints the new form everywhere it prints an account or an address, and
-  `wallet create` and `wallet restore` print both chains' forms. A program on a lethenon from before
-  this change, such as mystic-crypt-ui's plugin before its version bump, refuses the new form; the
-  old forms are still read on the test chain and as a recorded address, and
-  `PublishedAddress.parse` reads both
-- mystic-crypt 13.10 and crypt-data 13.3: the class path carries no pre-release any more. jaxb-api
-  2.4.0-b180830.0359 left with crypt-data#133, silly-collection brings commons-collections4 4.6.0
-  itself, and the dependency constraint of 0.8.1 is gone with its version property (#301)
+- An address is written with its chain and a checksum (#309, ADR 0007): `leth1:` or `tleth1:`, the
+  keys as before and 8 hex characters of SHA-256, read through `AddressText` in the order the record
+  fixes - normalise, form, checksum, network, keys - so a mistyped, truncated or garbled address, an
+  unknown version and an address of the other chain are each refused with their own message.
+  Normalising drops 24 listed spaces anywhere, at the start and the end too, and refuses every other
+  character outside ASCII letters, digits and `:` with its position and code point, invisible ones
+  such as U+200B and U+FEFF and direction controls such as U+202E included; the seed phrase reader
+  takes the same 24 from the same list (`TypedText`) and reads exactly what it read before. The
+  command line prints the new form everywhere it prints an account or an address, and `wallet
+  create` and `wallet restore` print both chains' forms. A program on a lethenon from before this
+  change, such as mystic-crypt-ui's plugin before its version bump, refuses the new form; the old
+  forms are still read on the test chain and as a recorded address, and `PublishedAddress.parse`
+  reads both
+
+Version 0.9.0
+-------------
+
+**0.9.0 cleans the distribution and helps with typing a seed phrase.** The tar.gz ships no
+pre-release any more, the libraries underneath are mystic-crypt 13.10 and crypt-data 13.3, and the
+seed-phrase field completes the words of the list. The waiting-list ownership of a served chain
+file (#299) stays as documented, by the decision of 2026-11-07; it is the next cycle's question.
+No format change against 0.8.1.
+
+ADDED:
+
+- typing in the seed-phrase field offers the words of the list that start with what is typed, so a
+  word is picked instead of spelled out; the completion never fills in a word by itself (#305)
+
+FIXED:
+
+- the pre-release pattern of `RuntimeDependenciesTest` reads a numbered build such as
+  `-b180830.0359`, so a jar like jaxb-api 2.4.0-b180830.0359 can no longer ship unflagged, as it
+  did in 0.8.0 and 0.8.1 (#301)
 - CORRECTION to 0.8.1: its entry says "a release ships no pre-release" and that the command line
   distribution ships none. Both statements were false: the 0.8.0 and 0.8.1 tar.gz hold
   `lib/jaxb-api-2.4.0-b180830.0359.jar`, a numbered build of a jaxb-api 2.4.0 that was never
   released, which crypt-data 13.2 brought to the runtime class path and the pre-release pattern of
   those releases did not read (#301)
+
+CHANGED:
+
+- mystic-crypt 13.10 and crypt-data 13.3: the class path carries no pre-release any more. jaxb-api
+  2.4.0-b180830.0359 left with crypt-data#133, silly-collection brings commons-collections4 4.6.0
+  itself, and the dependency constraint of 0.8.1 is gone with its version property (#301). The
+  library releases are verified on Maven Central with the family's signing subkey (RL-127's family
+  exemption)
+- sqlite-jdbc 3.54.1.0, published 2026-10-29 and so fourteen days in the open (RL-127)
+- the archives carry a static manifest and fixed entry times and order, so a build of the tag
+  reproduces the published bytes whatever the machine, language or directory (#314, family
+  standard crypt-data#139)
+- ADR 0007 proposes writing an address with its network and a checksum (#309); the decision and
+  its implementation are open and nothing of it is in this release
 
 Version 0.8.1
 -------------
