@@ -92,7 +92,9 @@ An example on the main chain, made for this record from keys whose private halve
 leth1:302a300506032b656e03210011d330df8c05da43f4eccfb466ee51d1805b3d7b305f7b7aa7d734b15f60bf58:302a300506032b6570032100dec5e421bd69658723cb35e7eeaf3a4678b6bc27a000027ee5b21878f63a7bcf:916000f6
 ```
 
-The same keys on the test chain end in `:0fc3d2e1` and start with `tleth1:`.
+It is the only example here. The test vectors, valid and invalid ones with the message each must
+give, on both chains, live in one machine-readable file that the tests read; section 5 of the
+specification names it once #309 is built.
 
 ### Reading
 
@@ -211,10 +213,18 @@ for a published address and a direct Ed25519 recipient.
   case; a direct ML-DSA-65 recipient gets no QR code.
 - The tests come first, in the pull request that builds it:
     - a round trip for both kinds of address on both chains;
+    - the vectors of the file above: the example of this record, the same keys on the test chain,
+      a direct Ed25519 recipient on both chains, each also in upper case and grouped with spaces,
+      and invalid ones with their messages;
     - every single substituted character of a fixed sample address is refused, every position
       against every other hex digit;
-    - every truncation and every swap of two neighbouring characters is refused;
+    - every truncation is refused, and every swap of two neighbouring characters that differ; a swap
+      of two equal characters leaves the address as it was and is skipped;
+    - an unknown version such as `leth2` is refused with its own message, before the checksum, and a
+      `tleth1` address with its `t` removed reports the checksum;
     - an address of the other network is refused, naming both;
-    - upper case and an address grouped with spaces are read;
+    - every code point of the list is dropped, at the start, inside and at the end, with the same
+      checksum as the address without it; U+200B, U+FEFF and U+202E are refused with their position
+      and code point;
     - an old form is read as a test chain recipient and as a recorded address, and refused as a
       main chain recipient.
