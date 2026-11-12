@@ -1,10 +1,10 @@
 # ADR 0007: An address is written with its network and a checksum
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-12
 - Asked for by the maintainer on 2026-11-12, after a review of the wallet on 2026-11-11 found that
-  an address carries neither a checksum nor a network (#309). Nothing is built before the
-  maintainer accepts this record, here or in #309
+  an address carries neither a checksum nor a network (#309), and accepted by the maintainer on the
+  same day, with the format unchanged and the points of a review worked in below (#309)
 
 ## Context
 
@@ -45,9 +45,11 @@ text form of an address can change without a hard fork (`PublishedAddress` Javad
    (`Blocks`, `Bytes`). checksum-up, which the rule names for checksums of bytes, would be a new
    dependency for the same one call; if the maintainer prefers it, that changes nothing else here.
 4. Be the same text in the command line and in the desktop plugin: what one prints, the other takes
-   (#37). Ignore case, and ignore whitespace inside, so a display in groups can be pasted back.
+   (#37). Ignore case and the whitespace listed under Reading, so a display in groups can be
+   pasted back, and read the command line's and the plugin's input through one reader.
 5. Fit a QR code in alphanumeric mode, whose character set is the digits, the upper-case letters,
-   the space and `$ % * + - . / :`.
+   the space and `$ % * + - . / :`, for a published address and a direct Ed25519 recipient. A
+   direct ML-DSA-65 recipient is exchanged as text, not as a QR code (see "QR codes" below).
 6. Keep reading the old form.
 
 ## The options
@@ -67,7 +69,7 @@ dependency, and B gives up its guarantee at this length
 ([BIP-173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki), read 2026-11-12). A
 costs 15 characters over today's form and nothing else.
 
-## Decision (proposed)
+## Decision
 
 Option A.
 
@@ -90,26 +92,103 @@ An example on the main chain, made for this record from keys whose private halve
 leth1:302a300506032b656e03210011d330df8c05da43f4eccfb466ee51d1805b3d7b305f7b7aa7d734b15f60bf58:302a300506032b6570032100dec5e421bd69658723cb35e7eeaf3a4678b6bc27a000027ee5b21878f63a7bcf:916000f6
 ```
 
-The same keys on the test chain end in `:0fc3d2e1` and start with `tleth1:`.
+It is the only example here. The test vectors, valid and invalid ones with the message each must
+give, on both chains, live in one machine-readable file that the tests read; section 5 of the
+specification names it once #309 is built.
 
 ### Reading
 
-- Case is ignored, and spaces and line breaks inside are dropped before anything is checked.
-- A checksum that does not match is refused with "this address is mistyped or incomplete: its
-  checksum does not match". The reader does not guess which character is wrong.
-- A network that is not the chain of the command is refused, naming both.
-- The old forms, `<view key>:<spend key>` and a bare account key, are still read:
-    - as a recipient on the test chain, with a notice that the address has no checksum;
-    - as an address recorded in a wallet entry, on either chain. mystic-crypt-ui's plugin compares a
-      recorded address with the wallet's by parsing it (`WalletVault.isTheAddressOf`), so an entry
-      written before this change keeps matching.
-- As a recipient on the main chain the old forms are refused: the main chain has not started, so
-  no address was ever handed out for it without a checksum.
+A reader takes these steps in this order and stops at the first that fails, with its own message:
+
+1. **Normalise.** Drop every code point of the list below, wherever it stands, at the start and at
+   the end too. Refuse every other character that is not an ASCII letter, an ASCII digit or `:`,
+   naming its position, counted in code points from 1, and its code point, for example "position
+   17 holds U+200B, and an address holds no such character". This covers invisible characters and
+   direction controls such as U+200B, U+FEFF and U+202E. Then lower-case the ASCII letters.
+2. **Split** at `:`.
+3. **Form.** A first part of `leth` or `tleth` and a number is the new form, anything else is
+   looked at as an old form (below). In the new form:
+    - an unknown version such as `leth2` is refused with "version 2 of the address format is not
+      known here; this build reads version 1";
+    - a published address has 4 parts and a direct recipient 3; another count is refused;
+    - every key is hex of even length, the checksum exactly 8 hex characters.
+4. **Checksum** over the normalised text before the last `:`. A mismatch is refused with "this
+   address is mistyped or incomplete: its checksum does not match". The reader does not guess which
+   character is wrong. Because the checksum comes before the network, a `tleth1` address with its
+   `t` removed reports the checksum, not the network.
+5. **Network.** An address of the other chain than the command's is refused, naming both.
+6. **Keys.** The view key must decode as an X25519 key, the spend key as an Ed25519 key, the
+   account key of a direct recipient as a key of a signature suite.
+
+The code points dropped in step 1, an enumerated list rather than a character class, so that a
+later Unicode version of the Java runtime does not change what an address reader accepts. They are
+exactly the separators `SeedPhrase.parse` reads between words since #286 (on OpenJDK 25 its
+`[\s\p{Z}]` matches these 24 and no other code point), and both readers take them from one list:
+
+| code point | name |
+|---|---|
+| U+0009 | CHARACTER TABULATION |
+| U+000A | LINE FEED (LF) |
+| U+000B | LINE TABULATION |
+| U+000C | FORM FEED (FF) |
+| U+000D | CARRIAGE RETURN (CR) |
+| U+0020 | SPACE |
+| U+00A0 | NO-BREAK SPACE |
+| U+1680 | OGHAM SPACE MARK |
+| U+2000 | EN QUAD |
+| U+2001 | EM QUAD |
+| U+2002 | EN SPACE |
+| U+2003 | EM SPACE |
+| U+2004 | THREE-PER-EM SPACE |
+| U+2005 | FOUR-PER-EM SPACE |
+| U+2006 | SIX-PER-EM SPACE |
+| U+2007 | FIGURE SPACE |
+| U+2008 | PUNCTUATION SPACE |
+| U+2009 | THIN SPACE |
+| U+200A | HAIR SPACE |
+| U+2028 | LINE SEPARATOR |
+| U+2029 | PARAGRAPH SEPARATOR |
+| U+202F | NARROW NO-BREAK SPACE |
+| U+205F | MEDIUM MATHEMATICAL SPACE |
+| U+3000 | IDEOGRAPHIC SPACE |
+
+The checksum is computed over the normalised form, so an address in upper case or grouped with
+spaces has the same checksum as the same address in lower case without them.
+
+The old forms, `<view key>:<spend key>` and a bare account key, pass steps 1 and 2 like the new
+form, have no checksum and no network, and are still read:
+
+- as a recipient on the test chain, with a notice that the address has no checksum;
+- as an address recorded in a wallet entry, on either chain. mystic-crypt-ui's plugin compares a
+  recorded address with the wallet's by parsing it (`WalletVault.isTheAddressOf`), so an entry
+  written before this change keeps matching.
+
+As a recipient on the main chain the old forms are refused: the main chain has not started, so no
+address was ever handed out for it without a checksum.
 
 ### Writing
 
 Every command and the plugin print the new form. A display may group it in fours for comparing it
 with its source; the groups are presentation, not format.
+
+### QR codes
+
+Measured on 2026-11-12 with `io.nayuki:qrcodegen` 1.8.0, the library astrapi69/mystic-crypt-ui#874
+recommends, run outside this repository (it is no dependency of lethenon): addresses built from
+OpenJDK 25 keys in the format above, upper-cased, one alphanumeric segment, the smallest version
+that fits at each error correction level.
+
+| address | characters | L | M | Q | H |
+|---|---|---|---|---|---|
+| published | 192 | version 6 | version 8 | version 10 | version 11 |
+| direct, Ed25519 | 103 | version 4 | version 5 | version 6 | version 8 |
+| direct, ML-DSA-65 | 3,963 | version 39, 173 x 173 modules | does not fit | does not fit | does not fit |
+
+Version 40 holds 4,296 alphanumeric characters at L and 3,391 at M (4,297 and 3,392 were refused).
+In lower case none of the three is alphanumeric, which is why a QR code carries the address in upper
+case. A direct ML-DSA-65 recipient fits only at the lowest error correction, in a code of 173 x 173
+modules that is not practical to scan: it is exchanged as text. The requirement for a QR code holds
+for a published address and a direct Ed25519 recipient.
 
 ## What this does not solve
 
@@ -130,13 +209,22 @@ with its source; the groups are presentation, not format.
   and every command that prints or reads an address. Section 5 of `docs/launch/specification.md`
   and the change log say what changed.
 - mystic-crypt-ui's plugin takes the format through the library and its QR code
-  (astrapi69/mystic-crypt-ui#874) encodes it in upper case.
+  (astrapi69/mystic-crypt-ui#874) encodes a published address or a direct Ed25519 recipient in upper
+  case; a direct ML-DSA-65 recipient gets no QR code.
 - The tests come first, in the pull request that builds it:
     - a round trip for both kinds of address on both chains;
+    - the vectors of the file above: the example of this record, the same keys on the test chain,
+      a direct Ed25519 recipient on both chains, each also in upper case and grouped with spaces,
+      and invalid ones with their messages;
     - every single substituted character of a fixed sample address is refused, every position
       against every other hex digit;
-    - every truncation and every swap of two neighbouring characters is refused;
+    - every truncation is refused, and every swap of two neighbouring characters that differ; a swap
+      of two equal characters leaves the address as it was and is skipped;
+    - an unknown version such as `leth2` is refused with its own message, before the checksum, and a
+      `tleth1` address with its `t` removed reports the checksum;
     - an address of the other network is refused, naming both;
-    - upper case and an address grouped with spaces are read;
+    - every code point of the list is dropped, at the start, inside and at the end, with the same
+      checksum as the address without it; U+200B, U+FEFF and U+202E are refused with their position
+      and code point;
     - an old form is read as a test chain recipient and as a recorded address, and refused as a
       main chain recipient.
