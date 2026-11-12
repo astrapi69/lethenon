@@ -1,10 +1,10 @@
 # ADR 0007: An address is written with its network and a checksum
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-12
 - Asked for by the maintainer on 2026-11-12, after a review of the wallet on 2026-11-11 found that
-  an address carries neither a checksum nor a network (#309). Nothing is built before the
-  maintainer accepts this record, here or in #309
+  an address carries neither a checksum nor a network (#309), and accepted by the maintainer on the
+  same day, with the format unchanged and the points of a review worked in below (#309)
 
 ## Context
 
@@ -67,7 +67,7 @@ dependency, and B gives up its guarantee at this length
 ([BIP-173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki), read 2026-11-12). A
 costs 15 characters over today's form and nothing else.
 
-## Decision (proposed)
+## Decision
 
 Option A.
 
