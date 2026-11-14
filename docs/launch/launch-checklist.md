@@ -90,6 +90,16 @@ ticked ([ADR 0005](../adr/0005-main-chain-genesis.md)).
 - [ ] **Seed nodes** as [infrastructure.md](infrastructure.md) describes them: at least two, at
   different providers, sized by measurement, with an onion service each.
 
+### The wallets that send on the main chain
+
+- [ ] **A send signed with a wallet file is confirmed on the main network.** The Lethenon plugin of
+  mystic-crypt-ui confirms a send on the main network only for the wallet kept in the vault; a send
+  signed with a wallet file asks nothing, because a wallet file does not record its network
+  (astrapi69/mystic-crypt-ui#978). Without a main chain this has no effect, which is why it waits
+  for this list (the maintainer's decision of 2026-11-14). Before the fix, the design question is
+  answered where a wallet file learns its network from; the fix ships in a release of
+  mystic-crypt-ui before the main chain starts.
+
 ### The release key
 
 - [ ] **The release key `D8C403518C49CA75` prepared** as [release-key.md](release-key.md) describes:
