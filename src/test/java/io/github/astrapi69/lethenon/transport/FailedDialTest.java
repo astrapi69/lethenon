@@ -90,8 +90,11 @@ class FailedDialTest
 
 			await(() -> "the refused dial recorded; refusals " + newcomer.refusals(),
 				() -> notConnected(newcomer) == 1);
-			await(() -> "the open node connected; peers " + newcomer.peers().size(),
-				() -> newcomer.peers().size() == 2);
+			// the open node counts as a peer before its address leaves the addresses heard of
+			// (#325): wait until the book has settled, not only until the peers stand
+			await(() -> "the open node connected and confirmed; peers " + newcomer.peers().size()
+				+ ", heard of " + newcomer.heardOf(),
+				() -> newcomer.peers().size() == 2 && newcomer.heardOf().size() == 1);
 			assertEquals(newcomer.waitingAddresses(), newcomer.heardOf(),
 				() -> "the refused address is not heard of, or does not wait; refusals "
 					+ newcomer.refusals());
@@ -127,10 +130,12 @@ class FailedDialTest
 
 			await(() -> "three refused dials recorded; refusals " + newcomer.refusals(),
 				() -> notConnected(newcomer) == 3);
-			await(() -> "the newcomer full; peers " + newcomer.peers().size() + ", heard of "
-				+ newcomer.heardOf(), () -> newcomer.peers().size() == Node.MAXIMUM_OUTGOING);
-			assertEquals(3, newcomer.heardOf().size(),
-				() -> "heard of " + newcomer.heardOf() + ", refusals " + newcomer.refusals());
+			// a peer counts before its address leaves the addresses heard of (#325): wait until
+			// the book has settled; the three refused addresses stay heard of, so three is the end
+			await(() -> "the newcomer full and its book settled; peers " + newcomer.peers().size()
+				+ ", heard of " + newcomer.heardOf() + ", refusals " + newcomer.refusals(),
+				() -> newcomer.peers().size() == Node.MAXIMUM_OUTGOING
+					&& newcomer.heardOf().size() == 3);
 			assertTrue(newcomer.waitingAddresses().containsAll(newcomer.heardOf()),
 				() -> "heard of " + newcomer.heardOf() + ", waiting " + newcomer.waitingAddresses());
 		}
