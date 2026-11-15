@@ -30,7 +30,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.InstantSource;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -53,23 +52,6 @@ class PeerBookTest
 	private static final PeerAddress FAILING = new PeerAddress("198.51.100.7", 18480);
 
 	private static final PeerAddress OTHER = new PeerAddress("198.51.100.8", 18480);
-
-	/** A clock that moves only when the test says so */
-	private static final class ManualClock implements InstantSource
-	{
-		private Instant now = Instant.parse("2026-11-15T12:00:00Z");
-
-		@Override
-		public Instant instant()
-		{
-			return now;
-		}
-
-		void advance(final Duration by)
-		{
-			now = now.plus(by);
-		}
-	}
 
 	private final ManualClock clock = new ManualClock();
 

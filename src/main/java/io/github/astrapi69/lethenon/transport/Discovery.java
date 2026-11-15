@@ -25,6 +25,7 @@
 package io.github.astrapi69.lethenon.transport;
 
 import java.io.IOException;
+import java.time.InstantSource;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -75,7 +76,7 @@ final class Discovery
 		Set<PeerAddress> handshaking();
 	}
 
-	private final PeerBook book = new PeerBook();
+	private final PeerBook book;
 
 	private final Set<PeerAddress> dialing = ConcurrentHashMap.newKeySet();
 
@@ -92,6 +93,16 @@ final class Discovery
 	Discovery(final List<Peer> peers, final Refusals refusals, final Dialer dialer,
 		final ExecutorService threads)
 	{
+		this(peers, refusals, dialer, threads, InstantSource.system());
+	}
+
+	/**
+	 * Discovery whose address book reads the given clock, which the tests move by hand (#296)
+	 */
+	Discovery(final List<Peer> peers, final Refusals refusals, final Dialer dialer,
+		final ExecutorService threads, final InstantSource clock)
+	{
+		this.book = new PeerBook(clock);
 		this.peers = peers;
 		this.refusals = refusals;
 		this.dialer = dialer;
