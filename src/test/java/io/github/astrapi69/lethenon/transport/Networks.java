@@ -28,6 +28,8 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
@@ -116,6 +118,112 @@ final class Networks
 				() -> hub.peers().size() == expected);
 		}
 		return others;
+	}
+
+	/**
+	 * The address book of a node's clearnet discovery, or of its anonymity zone's, as the object
+	 * its methods lock: a test that holds it stops every thread of the node at its next look into
+	 * the book. Read by reflection, because nothing else hands it out and nothing should
+	 *
+	 * @param ofTheZone
+	 *            the zone's book rather than the clearnet's
+	 * @return the lock
+	 */
+	static Object addressBookOf(final Node node, final boolean ofTheZone)
+	{
+		try
+		{
+			Object discovery;
+			if (ofTheZone)
+			{
+				java.lang.reflect.Field zone = Node.class.getDeclaredField("zone");
+				zone.setAccessible(true);
+				discovery = ((AnonymityZone)zone.get(node)).discovery();
+			}
+			else
+			{
+				java.lang.reflect.Field clearnet = Node.class.getDeclaredField("discovery");
+				clearnet.setAccessible(true);
+				discovery = clearnet.get(node);
+			}
+			java.lang.reflect.Field book = Discovery.class.getDeclaredField("book");
+			book.setAccessible(true);
+			return book.get(discovery);
+		}
+		catch (ReflectiveOperationException missing)
+		{
+			throw new AssertionError("no address book to hold", missing);
+		}
+	}
+
+	/**
+	 * Closes the far end of a connection the node dialled, before HELLO, while the node's address
+	 * book is held, and watches the address for a second. Holding the book stops the connection's
+	 * thread where it records the failure in the book, so an address that leaves its handshake
+	 * meanwhile left it before its failure was recorded, and was neither busy nor waiting then
+	 * (#296). A second is far more than the end of a local connection takes; on a machine slow
+	 * enough to need more, a wrong order passes unseen, a right one never fails
+	 *
+	 * @param book
+	 *            from {@link #addressBookOf(Node, boolean)}
+	 * @return what was waiting the moment the address left its handshake, or empty when it did not
+	 *         leave it while the book was held
+	 */
+	static Optional<List<PeerAddress>> leftItsHandshakeWhileTheBookWasHeld(final Object book,
+		final java.net.Socket farEnd, final PeerAddress address,
+		final Supplier<Set<PeerAddress>> handshaking, final Supplier<List<PeerAddress>> waiting)
+		throws IOException
+	{
+		synchronized (book)
+		{
+			farEnd.close();
+			long deadline = System.nanoTime() + Duration.ofSeconds(1).toNanos();
+			while (System.nanoTime() < deadline)
+			{
+				if (!handshaking.get().contains(address))
+				{
+					return Optional.of(waiting.get());
+				}
+				Thread.onSpinWait();
+			}
+			return Optional.empty();
+		}
+	}
+
+	/**
+	 * A peer at the hub that says HELLO with the given listening port and nothing more: the hub
+	 * confirms the address 127.0.0.1 and that port, which nothing has to listen on, and passes it
+	 * on; this returns once the hub has asked it for addresses, which it does after confirming it. It saves a node listening there that closes, whose port the system may hand out again
+	 * before a test binds it
+	 *
+	 * @return the connection, open; the caller closes it
+	 */
+	static java.net.Socket announcedAtTheHub(final List<BlockBody> genesis, final int hubPort,
+		final int listening) throws IOException
+	{
+		java.net.Socket announcing = new java.net.Socket("127.0.0.1", hubPort);
+		java.io.DataOutputStream out = new java.io.DataOutputStream(announcing.getOutputStream());
+		java.io.DataInputStream in = new java.io.DataInputStream(announcing.getInputStream());
+		Frames.write(out, new Frame(MessageType.HELLO,
+			Hello.of(genesis, listening, new java.security.SecureRandom().nextLong(1, Long.MAX_VALUE))
+				.encode()));
+		Frame answer = Frames.read(in, Frames.MAXIMUM_FRAME);
+		if (answer.type() != MessageType.HELLO)
+		{
+			announcing.close();
+			throw new AssertionError("the hub answered " + answer.type() + " instead of HELLO");
+		}
+		// the hub asks a listening peer for addresses once it has confirmed it (Discovery.connected)
+		for (int frames = 0; answer.type() != MessageType.GET_PEERS; frames++)
+		{
+			if (frames == 8)
+			{
+				announcing.close();
+				throw new AssertionError("the hub did not ask for addresses in 8 frames");
+			}
+			answer = Frames.read(in, Frames.MAXIMUM_FRAME);
+		}
+		return announcing;
 	}
 
 	/**
