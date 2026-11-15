@@ -123,9 +123,21 @@ How addresses travel:
 - A node keeps Monero's two lists: addresses it has itself been connected to, at most 1,000
   (`P2P_LOCAL_WHITE_PEERLIST_LIMIT`, `:138`), and addresses only heard of, at most 5,000
   (`P2P_LOCAL_GRAY_PEERLIST_LIMIT`, `:139`).
-- Only the first list is passed on, the newest 250. An address heard of becomes confirmed when a
-  connection to it succeeds, and is forgotten when one fails. An address that leads back to the
-  node itself is never dialled again.
+- Only the first list is passed on, the newest 250, and of it only addresses that are not waiting.
+  An address heard of becomes confirmed when a connection to it succeeds. A failed attempt, a dial
+  refused or a handshake that never completes, does not forget the address (#296): it waits before
+  it is tried again, 60 seconds after its first counted failure and twice as long after each
+  further one, at most an hour, and it is dropped only after 3 attempts without ever a success, or
+  after 10 counted failures with no success for 24 hours. The first failure counts; a further one
+  counts only once a connection to any address has succeeded since the last counted one, so an
+  outage on the node's own side counts once against each address instead of draining the book.
+  A success clears the count. A waiting address is neither dialled nor passed on; a dropped one is
+  gone at once and comes back only when a peer passes it on again, and hearing a known address
+  again leaves its count as it is. The values are Bitcoin Core's address manager
+  (`ADDRMAN_RETRIES` 3, `ADDRMAN_MAX_FAILURES` 10, `src/addrman.cpp`, v29.0) with its 7-day
+  `ADDRMAN_MIN_FAIL` scaled to 24 hours, because the book lives in memory and test nodes run for
+  days, and with Monero's hour as the longest wait (`P2P_FAILED_ADDR_FORGET_SECONDS`). An address
+  that leads back to the node itself is never dialled again.
 - While a node has room for outgoing connections, at most 12, it dials addresses from the lists.
   `--no-discovery` (`Node.discoverPeers(false)`) keeps it with the peers it was given, and it
   still answers `GET_PEERS`.
@@ -310,6 +322,7 @@ decisions, not on code:
 | peer exchange | protocol version 2 (#102) | nothing chain-specific; a node still runs only on the test chain |
 | genesis block in the code | the mechanism, no anchor (#104) | the mechanism in 0.4.0, every genesis reward burned to `Genesis.NOBODY` (#148); the anchor of `lethenon-2` is mined on the start day and released as 1.0.0 (ADR 0005) |
 | a chain identifier of the rules from 0.4.0 on | `lethenon-test-2`; `lethenon-test-1` refused as started under the rules before 0.4.0 (#137) | `lethenon-2`; `lethenon-1` refused the same way, so no version computes another chain's balances without a word (#137) |
+| an address book that failed dials do not drain | a failed attempt waits and counts, an address is dropped only after repeated failures over time; the book lives in memory (#296, from 0.10.0) | a book that survives a restart, and Bitcoin Core's buckets by source group with its terrible-keeping, so that whoever answers fastest or makes dials fail for a while cannot shape what a node knows; option 3 of #296, a prerequisite before a node runs on the main chain |
 
 The limits apply to the main chain from height 0 since #109. For main chains mined before, the
 timestamp bound changes nothing, because the clock only moves on. The size limit rejects a main

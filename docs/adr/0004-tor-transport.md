@@ -119,7 +119,7 @@ the daemon does not already do.
      keeps the node with the peers it was given, in the zone as on the clearnet. Nothing learnt
      in the zone reaches the clearnet lists, and nothing from the clearnet lists reaches the zone.
    - A zone slot that frees up is filled again, and an onion address that never completed a
-     handshake is forgotten, as on the clearnet (#121).
+     handshake waits and counts a failure, as on the clearnet (#121, #296).
 4. **The runbook against a real Tor.** `docs/tor.md`: the torrc lines (`SocksPort`,
    `HiddenServiceDir`, `HiddenServicePort`), the three node configurations, and a manual
    end-to-end run between two machines. It cannot be executed here (see "Measured in this
