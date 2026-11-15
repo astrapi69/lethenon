@@ -24,7 +24,9 @@
  */
 package io.github.astrapi69.lethenon.transport;
 
+import static io.github.astrapi69.lethenon.transport.Networks.addressBookOf;
 import static io.github.astrapi69.lethenon.transport.Networks.await;
+import static io.github.astrapi69.lethenon.transport.Networks.leftItsHandshakeWhileTheBookWasHeld;
 import static io.github.astrapi69.lethenon.transport.Networks.testGenesis;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -38,6 +40,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
@@ -192,6 +195,70 @@ class AnonymousInboundTest
 						+ "again: " + c.refusals());
 				assertTrue(c.anonymousPeers().stream()
 					.anyMatch(hello -> ONION_A.host().equals(hello.onionHost())));
+			}
+		}
+		finally
+		{
+			for (Socket socket : held)
+			{
+				socket.close();
+			}
+		}
+	}
+
+	/**
+	 * The same as for the clearnet (FailedDialTest): a learnt onion address whose connection
+	 * through the proxy opens and closes before HELLO leaves the zone's handshakes before
+	 * refillTheZone records its failure. The test holds c's zone address book while it closes the
+	 * far end, which stops the connection's thread where it records the failure; the address
+	 * leaves its handshake meanwhile, neither busy nor waiting (#296)
+	 */
+	@Test
+	@DisplayName("PIN #296: an onion address whose handshake ends without HELLO leaves its handshake before its failure is recorded")
+	void anOnionAddressWhoseHandshakeEndsWithoutHello_leavesItsHandshake_beforeItsFailureIsRecorded()
+		throws Exception
+	{
+		PeerAddress silentOnion = PeerAddress.parse(
+			"ssssssssssssssssssssssssssssssssssssssssssssssssssssssss.onion:18484");
+		List<Socket> held = new java.util.concurrent.CopyOnWriteArrayList<>();
+		try (Socks5Server socks = Socks5Server.start(); Socks5Server routeOfC = Socks5Server.start();
+			Node b = onionNode(socks, ONION_B, routeOfC);
+			Node speaking = onionNode(socks, silentOnion);
+			java.net.ServerSocket silent = new java.net.ServerSocket(0))
+		{
+			Thread.ofVirtual().start(() -> {
+				while (!silent.isClosed())
+				{
+					try
+					{
+						held.add(silent.accept());
+					}
+					catch (IOException closed)
+					{
+						return;
+					}
+				}
+			});
+			routeOfC.route(silentOnion.host(), silentOnion.port(), silent.getLocalPort());
+			speaking.connectAll(List.of(ONION_B));
+			await("the silent address confirmed at b", () -> b.anonymousPeers().size() == 1);
+			try (Node c = Node.on(genesis).anonymityZone(Outbound.through(routeOfC.address()), 2))
+			{
+				c.connectAll(List.of(ONION_B));
+				await(() -> "c in its handshake with the silent onion address; refusals "
+					+ c.refusals(),
+					() -> !held.isEmpty() && c.anonymousHandshaking().contains(silentOnion));
+
+				Optional<List<PeerAddress>> waitingWhenItLeft = leftItsHandshakeWhileTheBookWasHeld(
+					addressBookOf(c, true), held.get(0), silentOnion, c::anonymousHandshaking,
+					c::anonymousWaitingAddresses);
+
+				await(() -> "the failure recorded; waiting " + c.anonymousWaitingAddresses()
+					+ ", refusals " + c.refusals(),
+					() -> !c.anonymousHandshaking().contains(silentOnion)
+						&& c.anonymousWaitingAddresses().contains(silentOnion));
+				assertEquals(Optional.of(List.of()), waitingWhenItLeft,
+					"what was waiting when the silent onion address left its handshake");
 			}
 		}
 		finally

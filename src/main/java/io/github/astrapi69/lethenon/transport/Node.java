@@ -1174,6 +1174,39 @@ public final class Node implements AutoCloseable
 	}
 
 	/**
+	 * The clearnet addresses this node dialled whose connection is open and whose handshake has
+	 * not ended yet: discovery does not take them (#117, #296)
+	 *
+	 * @return a snapshot
+	 */
+	Set<PeerAddress> handshakingAddresses()
+	{
+		return Set.copyOf(handshaking);
+	}
+
+	/**
+	 * The onion addresses the anonymity zone dialled whose handshake has not ended yet (#296)
+	 *
+	 * @return a snapshot, empty without a zone
+	 */
+	Set<PeerAddress> anonymousHandshaking()
+	{
+		AnonymityZone anonymous = zone;
+		return anonymous == null ? Set.of() : Set.copyOf(anonymous.handshaking());
+	}
+
+	/**
+	 * The onion addresses that wait after a failed attempt before the zone dials them again (#296)
+	 *
+	 * @return a snapshot, empty without a zone
+	 */
+	List<PeerAddress> anonymousWaitingAddresses()
+	{
+		AnonymityZone anonymous = zone;
+		return anonymous == null ? List.of() : anonymous.discovery().waiting();
+	}
+
+	/**
 	 * Keeps and passes on loopback and private addresses, which a node otherwise never does
 	 * (#194): for nodes that find each other on one machine, which only the tests run. Unlike
 	 * Monero's {@code --allow-local-ip}, the command line has no option for it.

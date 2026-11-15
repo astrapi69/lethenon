@@ -26,11 +26,15 @@ package io.github.astrapi69.lethenon.transport;
 
 import static io.github.astrapi69.lethenon.transport.Networks.testGenesis;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashSet;
@@ -412,18 +416,40 @@ class DiscoveryTest
 	}
 
 	/**
-	 * Two fills at once, as the PEERS answers of two peers would run: the second has copied
-	 * dialing, still without the address, when the first takes the address and puts it on dialing.
-	 * The dials are held, so the address stays on dialing. Taking the retry starts its attempt, so
-	 * the second fill finds it waiting and leaves it (#296); it dialled the retry twice before
+	 * Two fills at once, as the PEERS answers of two peers would run: the second fill is held in
+	 * its selection, after it copied dialing, until the first fill has taken the address or waits
+	 * on a lock the second holds. The dials are held, so a taken address stays on dialing. Taking a
+	 * retry starts its attempt, so a second fill finds it waiting and leaves it (#296)
 	 */
 	@Test
-	@DisplayName("two fills at once take a retry once: the first one starts its attempt")
+	@DisplayName("two fills at once take a retry once")
 	void twoFillsAtOnce_takeARetryOnce() throws Exception
 	{
+		assertEquals(1, dialsSubmittedByTwoFillsAtOnce(true), "dials of " + NEW + " submitted");
+	}
+
+	/**
+	 * The same for a first attempt, which waits for nothing: the second fill copied dialing before
+	 * the first put the address on it, finds it neither busy nor waiting, and takes it as well
+	 * (#296)
+	 */
+	@Test
+	@DisplayName("PIN #296: two fills at once both take a first attempt, and it is dialled twice")
+	void twoFillsAtOnce_bothTakeAFirstAttempt() throws Exception
+	{
+		assertEquals(2, dialsSubmittedByTwoFillsAtOnce(false), "dials of " + NEW + " submitted");
+	}
+
+	/**
+	 * Runs two fills at once on an address heard of, a retry after its pause or a first attempt,
+	 * and counts the dials they submit
+	 */
+	private int dialsSubmittedByTwoFillsAtOnce(final boolean retry) throws Exception
+	{
 		ManualClock clock = new ManualClock();
+		AtomicReference<Thread> firstFill = new AtomicReference<>();
 		AtomicReference<Thread> secondFill = new AtomicReference<>();
-		CountDownLatch secondCopiedDialing = new CountDownLatch(1);
+		CountDownLatch secondInItsSelection = new CountDownLatch(1);
 		CountDownLatch firstTookTheAddress = new CountDownLatch(1);
 		Discovery.Dialer dialer = new Discovery.Dialer()
 		{
@@ -448,15 +474,21 @@ class DiscoveryTest
 			@Override
 			public Set<PeerAddress> handshaking()
 			{
-				if (Thread.currentThread() == secondFill.get() && secondCopiedDialing.getCount() > 0)
+				if (Thread.currentThread() == secondFill.get()
+					&& secondInItsSelection.getCount() > 0)
 				{
-					secondCopiedDialing.countDown();
-					awaitLatch(firstTookTheAddress);
+					secondInItsSelection.countDown();
+					letTheFirstFillGo(firstFill, firstTookTheAddress);
 				}
 				return Set.of();
 			}
 		};
-		HoldsEveryDial threads = new HoldsEveryDial();
+		HoldsEveryDial threads = new HoldsEveryDial(() -> {
+			if (Thread.currentThread() == firstFill.get())
+			{
+				firstTookTheAddress.countDown();
+			}
+		});
 		try (ServerSocket server = new ServerSocket(0);
 			Socket ours = new Socket("127.0.0.1", server.getLocalPort());
 			Socket theirs = server.accept())
@@ -466,32 +498,75 @@ class DiscoveryTest
 			peer.expectPeers();
 			discovery.dialling(false);
 			discovery.learn(peer, new PeerList(List.of(NEW)));
-			discovery.unreachable(NEW);
-			clock.advance(PeerBook.FIRST_PAUSE);
+			if (retry)
+			{
+				discovery.unreachable(NEW);
+				clock.advance(PeerBook.FIRST_PAUSE);
+			}
 			discovery.dialling(true);
-			Thread second = Thread.ofPlatform().unstarted(discovery::fill);
+			Thread second = Thread.ofPlatform().name("second fill").unstarted(discovery::fill);
 			secondFill.set(second);
 			second.start();
-			awaitLatch(secondCopiedDialing);
+			awaitLatch(secondInItsSelection);
+			Thread first = Thread.ofPlatform().name("first fill").unstarted(discovery::fill);
+			firstFill.set(first);
+			first.start();
 
-			discovery.fill();
-			firstTookTheAddress.countDown();
+			first.join(TimeUnit.SECONDS.toMillis(10));
 			second.join(TimeUnit.SECONDS.toMillis(10));
-
-			assertEquals(1, threads.held(), "dials of " + NEW + " submitted");
+			assertFalse(first.isAlive() || second.isAlive(), "a fill did not end");
+			return threads.held();
 		}
 	}
 
-	/** Holds every dial submitted to it, so that the address stays on dialing, and counts them */
+	/**
+	 * Holds the second fill until the first has taken the address, or until the first waits on a
+	 * lock the second fill holds, so that it cannot take the address before the second is done
+	 */
+	private static void letTheFirstFillGo(final AtomicReference<Thread> firstFill,
+		final CountDownLatch firstTookTheAddress)
+	{
+		ThreadMXBean threads = ManagementFactory.getThreadMXBean();
+		long holder = Thread.currentThread().threadId();
+		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+		while (firstTookTheAddress.getCount() > 0)
+		{
+			Thread first = firstFill.get();
+			ThreadInfo state = first == null ? null : threads.getThreadInfo(first.threadId());
+			if (state != null && state.getLockOwnerId() == holder)
+			{
+				return;
+			}
+			if (System.nanoTime() > deadline)
+			{
+				throw new AssertionError("the first fill neither took the address nor waited on "
+					+ "the second in 10 s");
+			}
+			Thread.onSpinWait();
+		}
+	}
+
+	/**
+	 * Holds every dial submitted to it, so that the address stays on dialing, counts them, and says
+	 * so on the thread that submits
+	 */
 	private static final class HoldsEveryDial extends AbstractExecutorService
 	{
 
 		private final AtomicInteger held = new AtomicInteger();
 
+		private final Runnable submitted;
+
+		HoldsEveryDial(final Runnable submitted)
+		{
+			this.submitted = submitted;
+		}
+
 		@Override
 		public void execute(final Runnable dial)
 		{
 			held.incrementAndGet();
+			submitted.run();
 		}
 
 		int held()

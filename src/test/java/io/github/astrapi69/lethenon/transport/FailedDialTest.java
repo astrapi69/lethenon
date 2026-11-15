@@ -24,15 +24,23 @@
  */
 package io.github.astrapi69.lethenon.transport;
 
+import static io.github.astrapi69.lethenon.transport.Networks.addressBookOf;
+import static io.github.astrapi69.lethenon.transport.Networks.announcedAtTheHub;
 import static io.github.astrapi69.lethenon.transport.Networks.await;
 import static io.github.astrapi69.lethenon.transport.Networks.connectedInTurn;
+import static io.github.astrapi69.lethenon.transport.Networks.leftItsHandshakeWhileTheBookWasHeld;
 import static io.github.astrapi69.lethenon.transport.Networks.testGenesis;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -128,5 +136,76 @@ class FailedDialTest
 		{
 			others.forEach(Node::close);
 		}
+	}
+
+	/**
+	 * A learnt address whose connection opens and then closes before HELLO: its handshake ends,
+	 * and Node.serve's outer finally records the failure only after the address has left
+	 * handshaking. The test holds the newcomer's address book while it closes the far end, which
+	 * stops the connection's thread where it records the failure; the address leaves its handshake
+	 * meanwhile, neither busy nor waiting, so a fill that runs then takes it again (#296)
+	 */
+	@Test
+	@DisplayName("PIN #296: an address whose handshake ends without HELLO leaves its handshake before its failure is recorded")
+	void anAddressWhoseHandshakeEndsWithoutHello_leavesItsHandshake_beforeItsFailureIsRecorded()
+		throws Exception
+	{
+		List<Socket> held = new CopyOnWriteArrayList<>();
+		try (Node hub = Node.on(genesis).discoverPeers(false).keepingLocalAddresses();
+			Node newcomer = Node.on(genesis).keepingLocalAddresses();
+			ServerSocket silent = silent(held))
+		{
+			int hubPort = hub.listen(0);
+			PeerAddress address = new PeerAddress("127.0.0.1", silent.getLocalPort());
+			try (Socket announcing = announcedAtTheHub(genesis, hubPort, address.port()))
+			{
+				await("the address confirmed at the hub", () -> hub.peers().size() == 1);
+				newcomer.connect("127.0.0.1", hubPort);
+				await(() -> "the newcomer in its handshake with " + address + "; refusals "
+					+ newcomer.refusals(),
+					() -> !held.isEmpty() && newcomer.handshakingAddresses().contains(address));
+
+				Optional<List<PeerAddress>> waitingWhenItLeft = leftItsHandshakeWhileTheBookWasHeld(
+					addressBookOf(newcomer, false), held.get(0), address,
+					newcomer::handshakingAddresses, newcomer::waitingAddresses);
+
+				await(() -> "the failure recorded; waiting " + newcomer.waitingAddresses()
+					+ ", refusals " + newcomer.refusals(),
+					() -> !newcomer.handshakingAddresses().contains(address)
+						&& newcomer.waitingAddresses().contains(address));
+				assertEquals(Optional.of(List.of()), waitingWhenItLeft,
+					"what was waiting when " + address + " left its handshake");
+			}
+		}
+		finally
+		{
+			for (Socket socket : held)
+			{
+				socket.close();
+			}
+		}
+	}
+
+	/**
+	 * Listens on a loopback port and accepts, but never says HELLO; what it accepted is held for
+	 * the test to close
+	 */
+	private static ServerSocket silent(final List<Socket> held) throws IOException
+	{
+		ServerSocket silent = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
+		Thread.ofVirtual().start(() -> {
+			while (!silent.isClosed())
+			{
+				try
+				{
+					held.add(silent.accept());
+				}
+				catch (IOException closed)
+				{
+					return;
+				}
+			}
+		});
+		return silent;
 	}
 }
