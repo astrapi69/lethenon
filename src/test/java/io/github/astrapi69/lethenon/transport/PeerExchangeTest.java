@@ -146,7 +146,7 @@ class PeerExchangeTest
 
 	/**
 	 * Whether a node that has only the hub has learnt the hub's addresses: from then on it holds
-	 * another peer, still hears of an address, or has forgotten one with its refusal recorded.
+	 * another peer, still hears of an address, or has a failed one with its refusal recorded.
 	 * Before the PEERS answer it has none of these, and would look settled
 	 */
 	private static boolean hasLearnt(final Node node)
@@ -156,19 +156,28 @@ class PeerExchangeTest
 
 	/**
 	 * Whether a node has stopped dialling: twelve peers, or no address left to dial and no
-	 * handshake open. A learnt address whose dial fails is forgotten (ADR 0003), so a node can end
-	 * below twelve with nothing heard of, under load as well as with an address that refuses (#278)
+	 * handshake open. A learnt address whose dial fails waits (ADR 0003, #296), so a node can end
+	 * below twelve with only waiting addresses heard of, under load as well as with an address
+	 * that refuses (#278)
 	 */
 	private static boolean hasSettled(final Node node)
 	{
 		return node.peers().size() == Node.MAXIMUM_OUTGOING
-			|| node.heardOf().isEmpty() && node.outgoingConnections() == node.peers().size();
+			|| dialable(node).isEmpty() && node.outgoingConnections() == node.peers().size();
+	}
+
+	/** The addresses a node has heard of and could dial now: those that do not wait (#296) */
+	private static List<PeerAddress> dialable(final Node node)
+	{
+		List<PeerAddress> waiting = node.waitingAddresses();
+		return node.heardOf().stream().filter(address -> !waiting.contains(address)).toList();
 	}
 
 	private static String stateOf(final Node node)
 	{
 		return node.peers().size() + " peers, " + node.outgoingConnections() + " outgoing, heard of "
-			+ node.heardOf() + ", refusals " + node.refusals();
+			+ node.heardOf() + ", waiting " + node.waitingAddresses() + ", refusals "
+			+ node.refusals();
 	}
 
 	static Stream<Arguments> learntAddressesThatRefuse()
@@ -205,9 +214,9 @@ class PeerExchangeTest
 			assertTrue(newcomer.outgoingConnections() <= Node.MAXIMUM_OUTGOING,
 				() -> "more than twelve outgoing; " + stateOf(newcomer));
 			assertTrue(
-				newcomer.heardOf().isEmpty()
+				dialable(newcomer).isEmpty()
 					|| newcomer.peers().size() == Node.MAXIMUM_OUTGOING,
-				() -> "below twelve while an address is still heard of; " + stateOf(newcomer));
+				() -> "below twelve while an address could still be dialled; " + stateOf(newcomer));
 			assertTrue(!newcomer.refusals().isEmpty() || newcomer.heardOf().size() == NOT_DIALLED,
 				() -> "with no dial failed, the addresses beyond the twelve are not all heard of; "
 					+ stateOf(newcomer));

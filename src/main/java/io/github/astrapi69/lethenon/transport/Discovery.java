@@ -64,7 +64,7 @@ final class Discovery
 		 * @throws NoRoom
 		 *             when this node's own limit is reached: the address stays in the book (#126)
 		 * @throws IOException
-		 *             when the address cannot be dialled: it is forgotten
+		 *             when the address cannot be dialled: it waits and counts a failure (#296)
 		 */
 		void dial(PeerAddress address) throws IOException;
 
@@ -122,12 +122,13 @@ final class Discovery
 	}
 
 	/**
-	 * A connection to this address opened and ended without a handshake: it is forgotten, as an
-	 * address that could not be dialled is, so that filling a slot again tries another one (#121)
+	 * A connection to this address opened and ended without a handshake: it waits and counts a
+	 * failure, as an address that could not be dialled does, so that filling a slot again tries
+	 * another one (#121, #296)
 	 */
 	void unreachable(final PeerAddress address)
 	{
-		book.forget(address);
+		book.failed(address);
 	}
 
 	void answer(final Peer peer)
@@ -175,7 +176,8 @@ final class Discovery
 	 * Dials one address, and fills again once it is no longer counted as dialling, unless the node
 	 * had no room: between the slot a dial takes and its leaving {@code dialing} it is counted twice,
 	 * so a fill that ran meanwhile stopped one slot early, and only this fill sees the true count
-	 * (#278). After a failed dial it also takes the next address in place of the forgotten one
+	 * (#278). After a failed dial it also takes the next address in place of the one that now
+	 * waits (#296)
 	 */
 	private void dial(final PeerAddress address)
 	{
@@ -193,9 +195,9 @@ final class Discovery
 		}
 		catch (IOException failed)
 		{
-			book.forget(address);
+			PeerBook.Failure failure = book.failed(address);
 			refusals.add(address + ", learnt from a peer, was not connected: "
-				+ failed.getMessage());
+				+ failed.getMessage() + "; " + failure.describe());
 		}
 		finally
 		{
@@ -229,6 +231,14 @@ final class Discovery
 	List<PeerAddress> heardOf()
 	{
 		return book.heardOf();
+	}
+
+	/**
+	 * The addresses that wait after a failed attempt before they are tried again (#296)
+	 */
+	List<PeerAddress> waiting()
+	{
+		return book.waiting();
 	}
 
 	/**

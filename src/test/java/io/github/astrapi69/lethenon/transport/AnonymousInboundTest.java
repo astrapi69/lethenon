@@ -188,7 +188,7 @@ class AnonymousInboundTest
 				assertEquals(2, c.anonymousPeers().size(), "c: " + c.refusals());
 				assertEquals(1, c.refusals().stream()
 					.filter(reason -> reason.contains("ended the handshake")).count(),
-					"the silent address is forgotten after its handshake timed out, not dialled "
+					"the silent address waits after its handshake timed out, it is not dialled "
 						+ "again: " + c.refusals());
 				assertTrue(c.anonymousPeers().stream()
 					.anyMatch(hello -> ONION_A.host().equals(hello.onionHost())));

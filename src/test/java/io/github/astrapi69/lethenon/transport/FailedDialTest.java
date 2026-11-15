@@ -42,7 +42,8 @@ import io.github.astrapi69.lethenon.SignatureSuite;
 import io.github.astrapi69.lethenon.Wallet;
 
 /**
- * What a node does with a learnt address whose dial fails (ADR 0003, #278). The failures are
+ * What a node does with a learnt address whose dial fails (ADR 0003, #278, #296): the address
+ * stays in the book and waits, and the node fills its slots from the others. The failures are
  * made, not hoped for: nodes the hub has already been connected to are closed before the newcomer
  * dials them, so their ports refuse the connection. The others connect to the hub one after the
  * other, which fixes the order the hub passes their addresses on in, and with it the order the
@@ -63,8 +64,8 @@ class FailedDialTest
 	}
 
 	@Test
-	@DisplayName("a learnt address whose dial is refused is forgotten, and the refusal says so (ADR 0003)")
-	void aLearntAddressWhoseDialIsRefused_isForgotten() throws IOException
+	@DisplayName("a learnt address whose dial is refused stays heard of and waits, and the refusal says so (ADR 0003, #296)")
+	void aLearntAddressWhoseDialIsRefused_staysHeardOfAndWaits() throws IOException
 	{
 		List<Node> others = new ArrayList<>();
 		try (Node hub = Node.on(genesis).discoverPeers(false).keepingLocalAddresses();
@@ -81,8 +82,13 @@ class FailedDialTest
 				() -> notConnected(newcomer) == 1);
 			await(() -> "the open node connected; peers " + newcomer.peers().size(),
 				() -> newcomer.peers().size() == 2);
-			assertEquals(List.of(), newcomer.heardOf(),
-				() -> "the refused address is still heard of; refusals " + newcomer.refusals());
+			assertEquals(newcomer.waitingAddresses(), newcomer.heardOf(),
+				() -> "the refused address is not heard of, or does not wait; refusals "
+					+ newcomer.refusals());
+			assertEquals(1, newcomer.heardOf().size(), () -> "heard of " + newcomer.heardOf());
+			assertTrue(newcomer.refusals().stream().anyMatch(refusal -> refusal.contains(NOT_CONNECTED)
+				&& refusal.contains("it waits 60 s before the next attempt (1 counted failure)")),
+				() -> "no refusal names the wait: " + newcomer.refusals());
 		}
 		finally
 		{
@@ -91,8 +97,8 @@ class FailedDialTest
 	}
 
 	@Test
-	@DisplayName("with three of fourteen learnt addresses refused, the newcomer holds twelve and has heard of none (#278)")
-	void threeRefusedOfFourteen_leaveTwelveAndNothingHeardOf() throws IOException
+	@DisplayName("with three of fourteen learnt addresses refused, the newcomer holds twelve and the three wait (#278, #296)")
+	void threeRefusedOfFourteen_leaveTwelveAndTheThreeWaiting() throws IOException
 	{
 		List<Node> others = new ArrayList<>();
 		try (Node hub = Node.on(genesis).discoverPeers(false).keepingLocalAddresses();
@@ -113,8 +119,10 @@ class FailedDialTest
 				() -> notConnected(newcomer) == 3);
 			await(() -> "the newcomer full; peers " + newcomer.peers().size() + ", heard of "
 				+ newcomer.heardOf(), () -> newcomer.peers().size() == Node.MAXIMUM_OUTGOING);
-			assertTrue(newcomer.heardOf().isEmpty(),
+			assertEquals(3, newcomer.heardOf().size(),
 				() -> "heard of " + newcomer.heardOf() + ", refusals " + newcomer.refusals());
+			assertTrue(newcomer.waitingAddresses().containsAll(newcomer.heardOf()),
+				() -> "heard of " + newcomer.heardOf() + ", waiting " + newcomer.waitingAddresses());
 		}
 		finally
 		{
