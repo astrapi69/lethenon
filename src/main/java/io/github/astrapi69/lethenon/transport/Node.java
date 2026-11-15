@@ -534,6 +534,13 @@ public final class Node implements AutoCloseable
 			}
 			finally
 			{
+				if (peer == null)
+				{
+					// a dialled address that did not complete a handshake waits before it is dialled
+					// again, and counts a failure; recorded while it still counts as in its
+					// handshake, so that no fill takes it in between (#296)
+					dialed.ifPresent(discovery::unreachable);
+				}
 				dialed.ifPresent(handshaking::remove);
 			}
 			peer.startWriting(threads);
@@ -559,12 +566,6 @@ public final class Node implements AutoCloseable
 			closeQuietly(socket);
 			counted.decrementAndGet();
 			endedDial(dialed, admitted);
-			if (peer == null)
-			{
-				// a dialled address that did not complete a handshake waits before it is dialled
-				// again, and counts a failure (#296)
-				dialed.ifPresent(discovery::unreachable);
-			}
 			if (counted == outgoing)
 			{
 				refill();
@@ -1043,6 +1044,12 @@ public final class Node implements AutoCloseable
 			}
 			finally
 			{
+				if (peer == null)
+				{
+					// as for clearnet peers: the failure is recorded while the onion address still
+					// counts as in its handshake (#296)
+					dialed.ifPresent(anonymous.discovery()::unreachable);
+				}
 				dialed.ifPresent(anonymous.handshaking()::remove);
 			}
 			if (peer == null)
@@ -1075,23 +1082,19 @@ public final class Node implements AutoCloseable
 			endedDial(dialed, peer != null);
 			if (dialed.isPresent())
 			{
-				refillTheZone(anonymous, dialed.get(), peer == null);
+				refillTheZone(anonymous);
 			}
 		}
 	}
 
 	/**
-	 * An outgoing slot of the zone is free again, as for clearnet peers (#121): an onion address
-	 * that never completed a handshake waits and counts a failure (#296), and peer exchange inside
-	 * the zone fills the slot from the onion addresses it knows
+	 * An outgoing slot of the zone is free again, as for clearnet peers (#121): peer exchange inside
+	 * the zone fills it from the onion addresses it knows. An onion address that never completed a
+	 * handshake already waits and counts a failure, recorded before it left the zone's handshakes
+	 * (#296)
 	 */
-	private void refillTheZone(final AnonymityZone anonymous, final PeerAddress dialed,
-		final boolean withoutAHandshake)
+	private void refillTheZone(final AnonymityZone anonymous)
 	{
-		if (withoutAHandshake)
-		{
-			anonymous.discovery().unreachable(dialed);
-		}
 		if (closed)
 		{
 			return;

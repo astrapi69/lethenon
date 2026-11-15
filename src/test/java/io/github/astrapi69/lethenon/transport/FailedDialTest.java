@@ -139,15 +139,16 @@ class FailedDialTest
 	}
 
 	/**
-	 * A learnt address whose connection opens and then closes before HELLO: its handshake ends,
-	 * and Node.serve's outer finally records the failure only after the address has left
-	 * handshaking. The test holds the newcomer's address book while it closes the far end, which
-	 * stops the connection's thread where it records the failure; the address leaves its handshake
-	 * meanwhile, neither busy nor waiting, so a fill that runs then takes it again (#296)
+	 * A learnt address whose connection opens and then closes before HELLO: Node.serve records the
+	 * failure while the address still counts as in its handshake, so no fill takes it in between
+	 * (#296). The test holds the newcomer's address book while it closes the far end, which stops
+	 * the connection's thread where it records the failure: the address stays in its handshake
+	 * meanwhile, and waits once the book is let go. Before, the outer finally recorded the failure
+	 * after the address had left its handshake, and it was neither busy nor waiting there
 	 */
 	@Test
-	@DisplayName("PIN #296: an address whose handshake ends without HELLO leaves its handshake before its failure is recorded")
-	void anAddressWhoseHandshakeEndsWithoutHello_leavesItsHandshake_beforeItsFailureIsRecorded()
+	@DisplayName("an address whose handshake ends without HELLO stays in its handshake until its failure is recorded")
+	void anAddressWhoseHandshakeEndsWithoutHello_staysInItsHandshake_untilItsFailureIsRecorded()
 		throws Exception
 	{
 		List<Socket> held = new CopyOnWriteArrayList<>();
@@ -173,7 +174,7 @@ class FailedDialTest
 					+ ", refusals " + newcomer.refusals(),
 					() -> !newcomer.handshakingAddresses().contains(address)
 						&& newcomer.waitingAddresses().contains(address));
-				assertEquals(Optional.of(List.of()), waitingWhenItLeft,
+				assertEquals(Optional.empty(), waitingWhenItLeft,
 					"what was waiting when " + address + " left its handshake");
 			}
 		}

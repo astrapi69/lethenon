@@ -168,23 +168,38 @@ final class Discovery
 	 * Dials addresses heard of or confirmed while this node has room for outgoing connections;
 	 * each dial runs on a thread of its own, so that a slow address holds up nothing else. Taking
 	 * an address starts the attempt on it, which sets its last try (#296): a retry waits again from
-	 * then, so neither a fill that runs at the same time nor one that runs before the outcome is
-	 * recorded takes it a second time
+	 * then, so a fill that runs before the outcome is recorded does not take it a second time. Two
+	 * fills at once never take the same address, a first attempt included ({@code take()})
 	 */
 	void fill()
 	{
 		while (dialling && dialer.outgoing() + dialing.size() < dialer.maximum())
 		{
-			Optional<PeerAddress> next = book.candidate(busy());
+			Optional<PeerAddress> next = take();
 			if (next.isEmpty())
 			{
 				return;
 			}
 			PeerAddress address = next.get();
-			dialing.add(address);
 			Optional<PeerBook.Attempt> attempt = book.attempted(address);
 			threads.submit(() -> dial(address, attempt));
 		}
+	}
+
+	/**
+	 * Takes the next address for a dial and puts it on {@code dialing} in one step: busy() is a
+	 * copy, and a fill that ran at the same time and copied {@code dialing} before the other put
+	 * the address on it took the address as well (#296). The step holds this discovery's lock and,
+	 * inside it, the address book's; nothing that holds either calls back into discovery, and no
+	 * caller of fill holds a lock of its own
+	 *
+	 * @return the address, now on {@code dialing}, or empty when there is none
+	 */
+	private synchronized Optional<PeerAddress> take()
+	{
+		Optional<PeerAddress> next = book.candidate(busy());
+		next.ifPresent(dialing::add);
+		return next;
 	}
 
 	/**

@@ -208,14 +208,15 @@ class AnonymousInboundTest
 
 	/**
 	 * The same as for the clearnet (FailedDialTest): a learnt onion address whose connection
-	 * through the proxy opens and closes before HELLO leaves the zone's handshakes before
-	 * refillTheZone records its failure. The test holds c's zone address book while it closes the
-	 * far end, which stops the connection's thread where it records the failure; the address
-	 * leaves its handshake meanwhile, neither busy nor waiting (#296)
+	 * through the proxy opens and closes before HELLO stays in the zone's handshakes until
+	 * Node.serveAnonymously has recorded its failure (#296). The test holds c's zone address book
+	 * while it closes the far end, which stops the connection's thread where it records the
+	 * failure. Before, refillTheZone recorded it after the address had left its handshake, and it
+	 * was neither busy nor waiting there
 	 */
 	@Test
-	@DisplayName("PIN #296: an onion address whose handshake ends without HELLO leaves its handshake before its failure is recorded")
-	void anOnionAddressWhoseHandshakeEndsWithoutHello_leavesItsHandshake_beforeItsFailureIsRecorded()
+	@DisplayName("an onion address whose handshake ends without HELLO stays in its handshake until its failure is recorded")
+	void anOnionAddressWhoseHandshakeEndsWithoutHello_staysInItsHandshake_untilItsFailureIsRecorded()
 		throws Exception
 	{
 		PeerAddress silentOnion = PeerAddress.parse(
@@ -257,7 +258,7 @@ class AnonymousInboundTest
 					+ ", refusals " + c.refusals(),
 					() -> !c.anonymousHandshaking().contains(silentOnion)
 						&& c.anonymousWaitingAddresses().contains(silentOnion));
-				assertEquals(Optional.of(List.of()), waitingWhenItLeft,
+				assertEquals(Optional.empty(), waitingWhenItLeft,
 					"what was waiting when the silent onion address left its handshake");
 			}
 		}

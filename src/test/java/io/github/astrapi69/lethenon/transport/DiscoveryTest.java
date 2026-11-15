@@ -429,15 +429,16 @@ class DiscoveryTest
 	}
 
 	/**
-	 * The same for a first attempt, which waits for nothing: the second fill copied dialing before
-	 * the first put the address on it, finds it neither busy nor waiting, and takes it as well
-	 * (#296)
+	 * The same for a first attempt, which waits for nothing: the selection and the entry on dialing
+	 * are one locked step, so the first fill waits until the second has taken the address, and then
+	 * finds it busy (#296). Before, the second fill copied dialing before the first put the address
+	 * on it, and both took it
 	 */
 	@Test
-	@DisplayName("PIN #296: two fills at once both take a first attempt, and it is dialled twice")
-	void twoFillsAtOnce_bothTakeAFirstAttempt() throws Exception
+	@DisplayName("two fills at once take a first attempt once: the selection is one locked step")
+	void twoFillsAtOnce_takeAFirstAttemptOnce() throws Exception
 	{
-		assertEquals(2, dialsSubmittedByTwoFillsAtOnce(false), "dials of " + NEW + " submitted");
+		assertEquals(1, dialsSubmittedByTwoFillsAtOnce(false), "dials of " + NEW + " submitted");
 	}
 
 	/**

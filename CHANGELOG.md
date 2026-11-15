@@ -28,7 +28,10 @@ Unreleased
   takes the address, so a retry waits again from then: neither a fill running at the same time nor
   one running before the retry's outcome is recorded dials it a second time, and a failure sets the
   last try once more, so the pause runs from the failure. A dial this node had no room for gives the
-  last try back. No family caller is affected: `PeerBook` and `Discovery` are package-private
+  last try back. A first attempt is taken once as well: two fills at once never take the same
+  address, and a connection that ends without a handshake records its failure before the address
+  leaves its handshake, on the clearnet and in the anonymity zone. No family caller is affected:
+  `PeerBook` and `Discovery` are package-private
 
 Version 0.9.0
 -------------
