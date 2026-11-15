@@ -521,6 +521,99 @@ class DiscoveryTest
 	}
 
 	/**
+	 * Two fills at once for the last free slot: the second has read the count of outgoing
+	 * connections when the first takes an address, dials it, and the dial leaves dialing; the
+	 * second then adds a dialing that no longer holds it to a count that does not hold it yet,
+	 * finds a slot that is gone, and takes a second address. Node.connect refuses that dial for the
+	 * node's own limit (NoRoom), and the address stays in the book undialled while the node is
+	 * full, which is the third way FailedDialTest failed under load (#325)
+	 */
+	@Test
+	@DisplayName("PIN #325: two fills at once for the last free slot both dial")
+	void twoFillsAtOnce_forTheLastFreeSlot_bothDial() throws Exception
+	{
+		assertEquals(2, dialsForTheLastFreeSlot(), "dials for one free slot");
+	}
+
+	/**
+	 * Runs two fills at once while one slot is free, the first dialling on its own thread as soon
+	 * as it takes an address, and counts the dials
+	 */
+	private int dialsForTheLastFreeSlot() throws Exception
+	{
+		AtomicInteger outgoing = new AtomicInteger(Node.MAXIMUM_OUTGOING - 1);
+		List<PeerAddress> dialled = new CopyOnWriteArrayList<>();
+		AtomicReference<Thread> firstFill = new AtomicReference<>();
+		AtomicReference<Thread> secondFill = new AtomicReference<>();
+		CountDownLatch secondReadTheCount = new CountDownLatch(1);
+		CountDownLatch firstDialled = new CountDownLatch(1);
+		Discovery.Dialer dialer = new Discovery.Dialer()
+		{
+			/** The second fill reads the count, then waits before it goes on with it */
+			@Override
+			public int outgoing()
+			{
+				int count = outgoing.get();
+				if (Thread.currentThread() == secondFill.get() && secondReadTheCount.getCount() > 0)
+				{
+					secondReadTheCount.countDown();
+					letTheFirstFillGo(firstFill, firstDialled);
+				}
+				return count;
+			}
+
+			@Override
+			public int maximum()
+			{
+				return Node.MAXIMUM_OUTGOING;
+			}
+
+			/** As Node.connect: the slot counts from the dial on */
+			@Override
+			public void dial(final PeerAddress address)
+			{
+				outgoing.incrementAndGet();
+				dialled.add(address);
+				if (Thread.currentThread() == firstFill.get())
+				{
+					firstDialled.countDown();
+				}
+			}
+
+			/** A dialled address is connected, and so busy */
+			@Override
+			public Set<PeerAddress> handshaking()
+			{
+				return Set.copyOf(dialled);
+			}
+		};
+		try (ServerSocket server = new ServerSocket(0);
+			Socket ours = new Socket("127.0.0.1", server.getLocalPort());
+			Socket theirs = server.accept())
+		{
+			Discovery discovery = new Discovery(List.of(), new Refusals(), dialer,
+				new OnTheCallingThread());
+			Peer peer = peerOver(ours);
+			peer.expectPeers();
+			discovery.dialling(false);
+			discovery.learn(peer, new PeerList(List.of(NEW, ANOTHER)));
+			discovery.dialling(true);
+			Thread second = Thread.ofPlatform().name("second fill").unstarted(discovery::fill);
+			secondFill.set(second);
+			second.start();
+			awaitLatch(secondReadTheCount);
+			Thread first = Thread.ofPlatform().name("first fill").unstarted(discovery::fill);
+			firstFill.set(first);
+			first.start();
+
+			first.join(TimeUnit.SECONDS.toMillis(10));
+			second.join(TimeUnit.SECONDS.toMillis(10));
+			assertFalse(first.isAlive() || second.isAlive(), "a fill did not end");
+			return dialled.size();
+		}
+	}
+
+	/**
 	 * Holds the second fill until the first has taken the address, or until the first waits on a
 	 * lock the second fill holds, so that it cannot take the address before the second is done
 	 */
