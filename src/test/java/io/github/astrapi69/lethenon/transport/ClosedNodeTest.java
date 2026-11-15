@@ -25,7 +25,7 @@
 package io.github.astrapi69.lethenon.transport;
 
 import static io.github.astrapi69.lethenon.transport.Networks.testGenesis;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.net.ConnectException;
@@ -85,14 +85,13 @@ class ClosedNodeTest
 	}
 
 	/**
-	 * Today: of {@value #DIALS} nodes closed one after the other, the dial right after close()
-	 * reaches the port of at least one. Measured on develop ed2ac66: 139 of 200 without load, 64
-	 * of 200 with every core busy, so all {@value #DIALS} refused by chance is 0.68 to the 40th,
-	 * about 2 in 10 million, with the rate under load
+	 * Of {@value #DIALS} nodes closed one after the other, no dial right after close() reaches the
+	 * port: close() waits until the accepting threads have ended. Before, at least one did; on
+	 * develop ed2ac66, 139 of 200 without load and 64 of 200 with every core busy
 	 */
-	@ParameterizedTest(name = "PIN #325: {0} can still take a dial right after the node closed")
+	@ParameterizedTest(name = "{0} refuses a dial right after the node closed")
 	@MethodSource("ports")
-	void aPortCanStillTakeADial_rightAfterTheNodeClosed(final Port port)
+	void aPortRefusesADial_rightAfterTheNodeClosed(final Port port)
 		throws IOException, InterruptedException
 	{
 		int taken = 0;
@@ -108,7 +107,7 @@ class ClosedNodeTest
 				taken++;
 			}
 		}
-		assertTrue(taken > 0, "no dial of " + DIALS + " was taken right after close()");
+		assertEquals(0, taken, "dials of " + DIALS + " taken right after close()");
 	}
 
 	/**

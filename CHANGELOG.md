@@ -32,6 +32,10 @@ Unreleased
   address, and a connection that ends without a handshake records its failure before the address
   leaves its handshake, on the clearnet and in the anonymity zone. No family caller is affected:
   `PeerBook` and `Discovery` are package-private
+- `Node.close()` returns once the node's ports no longer take a connection (#325). It returned
+  while the thread accepting on a listener had not yet finished closing it, and a dial right after
+  `close()` was taken and reset instead of refused: 139 of 200 such dials without load. `close()`
+  now waits for the accepting threads, at most five seconds
 
 Version 0.9.0
 -------------
