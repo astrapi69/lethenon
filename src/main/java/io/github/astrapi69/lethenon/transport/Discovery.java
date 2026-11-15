@@ -173,7 +173,7 @@ final class Discovery
 	 */
 	void fill()
 	{
-		while (dialling && dialer.outgoing() + dialing.size() < dialer.maximum())
+		while (dialling)
 		{
 			Optional<PeerAddress> next = take();
 			if (next.isEmpty())
@@ -187,16 +187,26 @@ final class Discovery
 	}
 
 	/**
-	 * Takes the next address for a dial and puts it on {@code dialing} in one step: busy() is a
-	 * copy, and a fill that ran at the same time and copied {@code dialing} before the other put
-	 * the address on it took the address as well (#296). The step holds this discovery's lock and,
-	 * inside it, the address book's; nothing that holds either calls back into discovery, and no
-	 * caller of fill holds a lock of its own
+	 * Takes the next address for a dial, if this node has room for one, and puts it on
+	 * {@code dialing} in one step: busy() is a copy, and a fill that ran at the same time and
+	 * copied {@code dialing} before the other put the address on it took the address as well
+	 * (#296). The room is counted inside the step too, {@code dialing} before the outgoing
+	 * connections: a dial counts as outgoing before it leaves {@code dialing}, so read in that order
+	 * the two never miss a dial under way, and two fills at once never take more addresses than
+	 * there are slots; read the other way, or outside the step, the last free slot went to both,
+	 * and one dial was refused for this node's own limit (#325). The step holds this discovery's
+	 * lock and, inside it, the address book's; nothing that holds either calls back into
+	 * discovery, and no caller of fill holds a lock of its own
 	 *
-	 * @return the address, now on {@code dialing}, or empty when there is none
+	 * @return the address, now on {@code dialing}, or empty when there is none or no room
 	 */
 	private synchronized Optional<PeerAddress> take()
 	{
+		int underWay = dialing.size();
+		if (underWay + dialer.outgoing() >= dialer.maximum())
+		{
+			return Optional.empty();
+		}
 		Optional<PeerAddress> next = book.candidate(busy());
 		next.ifPresent(dialing::add);
 		return next;

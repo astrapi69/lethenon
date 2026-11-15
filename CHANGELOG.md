@@ -36,6 +36,10 @@ Unreleased
   while the thread accepting on a listener had not yet finished closing it, and a dial right after
   `close()` was taken and reset instead of refused: 139 of 200 such dials without load. `close()`
   now waits for the accepting threads, at most five seconds
+- Two fills at once never take more addresses than the node has free slots (#325). The room was
+  counted outside the step that takes an address, and the last free slot could go to both: one
+  dial was refused for the node's own limit, and its address stayed undialled while the node was
+  full
 
 Version 0.9.0
 -------------
