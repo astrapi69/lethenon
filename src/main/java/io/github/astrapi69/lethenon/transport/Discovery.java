@@ -166,7 +166,10 @@ final class Discovery
 
 	/**
 	 * Dials addresses heard of or confirmed while this node has room for outgoing connections;
-	 * each dial runs on a thread of its own, so that a slow address holds up nothing else
+	 * each dial runs on a thread of its own, so that a slow address holds up nothing else. Taking
+	 * an address starts the attempt on it, which sets its last try (#296): a retry waits again from
+	 * then, so neither a fill that runs at the same time nor one that runs before the outcome is
+	 * recorded takes it a second time
 	 */
 	void fill()
 	{
@@ -179,7 +182,8 @@ final class Discovery
 			}
 			PeerAddress address = next.get();
 			dialing.add(address);
-			threads.submit(() -> dial(address));
+			Optional<PeerBook.Attempt> attempt = book.attempted(address);
+			threads.submit(() -> dial(address, attempt));
 		}
 	}
 
@@ -188,9 +192,13 @@ final class Discovery
 	 * had no room: between the slot a dial takes and its leaving {@code dialing} it is counted twice,
 	 * so a fill that ran meanwhile stopped one slot early, and only this fill sees the true count
 	 * (#278). After a failed dial it also takes the next address in place of the one that now
-	 * waits (#296)
+	 * waits (#296). A dial this node had no room for was not an attempt on the address, and gives
+	 * its last try back (#126, #296)
+	 *
+	 * @param attempt
+	 *            the attempt the fill started, empty for an address the book no longer held
 	 */
-	private void dial(final PeerAddress address)
+	private void dial(final PeerAddress address, final Optional<PeerBook.Attempt> attempt)
 	{
 		boolean noRoom = false;
 		try
@@ -200,6 +208,7 @@ final class Discovery
 		catch (NoRoom busy)
 		{
 			// this node was full, the address is not at fault: it stays to be dialled when there is room
+			attempt.ifPresent(book::withdrawn);
 			refusals.add(address + ", learnt from a peer, was not dialled, it stays in the book: "
 				+ busy.getMessage());
 			noRoom = true;

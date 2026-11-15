@@ -47,7 +47,9 @@ import java.util.Set;
  * {@link #FAILURE_WINDOW}. The first failure counts; a further one counts only once a connection to
  * any address has succeeded since the last counted one, so an outage on this node's own side counts
  * once against each address instead of draining the book. A waiting address is neither offered for
- * a dial nor passed on. A local address ({@link PeerAddress#isLocal()}) is neither kind: no other
+ * a dial nor passed on. Every attempt sets the address's last try when it starts, so an address
+ * being retried waits again from then, and is not offered a second time before its outcome is
+ * recorded; a failure sets it once more, and the pause runs from the failure. A local address ({@link PeerAddress#isLocal()}) is neither kind: no other
  * node reaches it, so it is not kept and never passed on (#194).
  */
 final class PeerBook
@@ -129,6 +131,20 @@ final class PeerBook
 				+ (counted ? "" : ", this one not counted: no connection succeeded since the last")
 				+ ")";
 		}
+	}
+
+	/**
+	 * An attempt that started on an address the book holds
+	 *
+	 * @param address
+	 *            the address tried
+	 * @param started
+	 *            when it started, the address's last try from then on
+	 * @param before
+	 *            the last try before it, null when the address had none
+	 */
+	record Attempt(PeerAddress address, Instant started, Instant before)
+	{
 	}
 
 	/** What is known of the attempts on one address */
@@ -219,7 +235,7 @@ final class PeerBook
 	 */
 	synchronized Failure failed(final PeerAddress address)
 	{
-		if (!confirmed.contains(address) && !heard.contains(address))
+		if (!holds(address))
 		{
 			return new Failure(false, 0, false, Duration.ZERO);
 		}
@@ -239,6 +255,48 @@ final class PeerBook
 			return new Failure(counted, known.failures, true, Duration.ZERO);
 		}
 		return new Failure(counted, known.failures, false, pause(known.failures));
+	}
+
+	/**
+	 * An attempt on the address starts: from now on this is its last try ("Every attempt sets
+	 * lastTry", the decision of 2026-11-14 on #296), so an address being retried waits again from
+	 * now and is not offered a second time while its outcome is not recorded. An address the book
+	 * does not hold is left alone
+	 *
+	 * @param address
+	 *            the address about to be dialled
+	 * @return the attempt, for {@link #withdrawn(Attempt)}; empty for an address the book does not
+	 *         hold
+	 */
+	synchronized Optional<Attempt> attempted(final PeerAddress address)
+	{
+		if (!holds(address))
+		{
+			return Optional.empty();
+		}
+		Instant now = clock.instant();
+		Attempts known = attempts.computeIfAbsent(address, key -> new Attempts());
+		Attempt attempt = new Attempt(address, now, known.lastTry);
+		known.lastTry = now;
+		return Optional.of(attempt);
+	}
+
+	/**
+	 * An attempt that did not happen after all, because this node had no room for it (#126): the
+	 * address is not at fault and keeps the last try it had before, unless something else has
+	 * been recorded for it since. An address that had no last try before keeps the attempt's,
+	 * which does not make it wait without a counted failure
+	 *
+	 * @param attempt
+	 *            what {@link #attempted(PeerAddress)} returned
+	 */
+	synchronized void withdrawn(final Attempt attempt)
+	{
+		Attempts known = attempts.get(attempt.address());
+		if (known != null && attempt.before() != null && attempt.started().equals(known.lastTry))
+		{
+			known.lastTry = attempt.before();
+		}
 	}
 
 	/**
@@ -361,6 +419,11 @@ final class PeerBook
 		}
 		return known.failures >= MAXIMUM_FAILURES
 			&& Duration.between(known.lastSuccess, now).compareTo(FAILURE_WINDOW) > 0;
+	}
+
+	private boolean holds(final PeerAddress address)
+	{
+		return confirmed.contains(address) || heard.contains(address);
 	}
 
 	/**

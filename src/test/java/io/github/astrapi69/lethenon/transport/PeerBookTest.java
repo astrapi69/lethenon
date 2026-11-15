@@ -217,6 +217,110 @@ class PeerBookTest
 	}
 
 	@Test
+	@DisplayName("a retry waits again from its start, and is not offered a second time while it runs")
+	void aRetry_waitsAgainFromItsStart()
+	{
+		book.confirmed(FAILING);
+		book.failed(FAILING);
+		clock.advance(PeerBook.FIRST_PAUSE);
+		assertEquals(Optional.of(FAILING), book.candidate(Set.of()));
+
+		book.attempted(FAILING);
+
+		assertEquals(Optional.empty(), book.candidate(Set.of()));
+		assertEquals(List.of(FAILING), book.waiting());
+		assertEquals(List.of(), book.shareable());
+	}
+
+	/** A moment after a failed retry, and what the book offers then */
+	record Moment(String name, Duration sinceTheFailure, Optional<PeerAddress> offered)
+	{
+		@Override
+		public String toString()
+		{
+			return name;
+		}
+	}
+
+	static Stream<Moment> afterAFailedRetry()
+	{
+		return Stream.of(
+			new Moment("one millisecond before the pause after the failure is over, it waits",
+				PeerBook.FIRST_PAUSE.minusMillis(1), Optional.empty()),
+			new Moment("when the pause after the failure is over, it is offered",
+				PeerBook.FIRST_PAUSE, Optional.of(FAILING)));
+	}
+
+	/**
+	 * Every attempt sets the last try when it starts, and a failure sets it again: the pause of a
+	 * retry that took ten seconds to fail runs from its failure, not from its start, which would
+	 * leave fifty seconds of it
+	 */
+	@ParameterizedTest(name = "a retry that failed after 10 s, {0}")
+	@MethodSource("afterAFailedRetry")
+	void aFailedRetry_waitsItsPauseFromTheFailure(final Moment moment)
+	{
+		book.heard(List.of(FAILING));
+		book.failed(FAILING);
+		clock.advance(PeerBook.FIRST_PAUSE);
+		book.attempted(FAILING);
+		clock.advance(Duration.ofSeconds(10));
+		PeerBook.Failure failure = book.failed(FAILING);
+
+		clock.advance(moment.sinceTheFailure());
+
+		assertEquals(PeerBook.FIRST_PAUSE, failure.pause(), failure.toString());
+		assertEquals(moment.offered(), book.candidate(Set.of()));
+	}
+
+	@Test
+	@DisplayName("a withdrawn retry gives its last try back: the address is offered at once")
+	void aWithdrawnRetry_givesItsLastTryBack()
+	{
+		book.heard(List.of(FAILING));
+		book.failed(FAILING);
+		clock.advance(PeerBook.FIRST_PAUSE);
+		PeerBook.Attempt attempt = book.attempted(FAILING).orElseThrow();
+		assertEquals(Optional.empty(), book.candidate(Set.of()), "while the attempt runs");
+
+		book.withdrawn(attempt);
+
+		assertEquals(Optional.of(FAILING), book.candidate(Set.of()));
+		assertEquals(List.of(), book.waiting());
+	}
+
+	@Test
+	@DisplayName("a withdrawn attempt leaves alone what was recorded for the address since")
+	void aWithdrawnAttempt_leavesALaterRecordAlone()
+	{
+		book.heard(List.of(FAILING));
+		book.failed(FAILING);
+		clock.advance(PeerBook.FIRST_PAUSE);
+		PeerBook.Attempt attempt = book.attempted(FAILING).orElseThrow();
+		clock.advance(Duration.ofSeconds(1));
+		book.failed(FAILING);
+
+		book.withdrawn(attempt);
+
+		assertEquals(Optional.empty(), book.candidate(Set.of()));
+		clock.advance(PeerBook.FIRST_PAUSE);
+		assertEquals(Optional.of(FAILING), book.candidate(Set.of()));
+	}
+
+	@Test
+	@DisplayName("an attempt on an address the book does not hold leaves the book alone")
+	void anAttemptOnAnAddressNotInTheBook_leavesTheBookAlone()
+	{
+		assertEquals(Optional.empty(), book.attempted(FAILING));
+		assertEquals(List.of(), book.waiting());
+		assertEquals(List.of(), book.heardOf());
+
+		book.heard(List.of(FAILING));
+
+		assertEquals(Optional.of(FAILING), book.candidate(Set.of()));
+	}
+
+	@Test
 	@DisplayName("an address the book does not hold is left alone when it fails")
 	void anAddressNotInTheBook_isLeftAlone()
 	{
