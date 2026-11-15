@@ -147,13 +147,13 @@ class DiscoveryTest
 			new Ending("refused for the anonymity zone's limit: the address is kept",
 				new NoRoom("the anonymity zone has 2 anonymity connection(s), its limit (ADR 0004)"),
 				true),
-			new Ending("the address could not be reached: it is forgotten",
-				new IOException("Connection refused"), false));
+			new Ending("the address could not be reached: it is kept, and waits (#296)",
+				new IOException("Connection refused"), true));
 	}
 
 	@ParameterizedTest(name = "{0}")
 	@MethodSource("endings")
-	void aDialThatThrows_keepsOrForgetsTheAddress(final Ending ending) throws Exception
+	void aDialThatThrows_keepsTheAddress(final Ending ending) throws Exception
 	{
 		Discovery.Dialer dialer = new Discovery.Dialer()
 		{

@@ -17,6 +17,15 @@ Unreleased
   change, such as mystic-crypt-ui's plugin before its version bump, refuses the new form; the old
   forms are still read on the test chain and as a recorded address, and `PublishedAddress.parse`
   reads both
+- CHANGED BEHAVIOUR: a failed attempt on an address no longer forgets it (#296, ADR 0003). A dial
+  that is refused, or a connection that ends without a handshake, counts a failure: the address
+  waits 60 seconds, twice as long after each further counted failure and at most an hour, and is
+  neither dialled nor passed on while it waits. It leaves the book after 3 counted failures without
+  ever a success, or after 10 with no success for 24 hours. A further failure counts only once a
+  connection to some other address has succeeded since the last one, so an outage on the node's own
+  side no longer empties its book. The refusal log says how long the address waits and how many
+  failures it has, instead of forgetting it. No family caller is affected: `PeerBook` and
+  `Discovery` are package-private
 
 Version 0.9.0
 -------------

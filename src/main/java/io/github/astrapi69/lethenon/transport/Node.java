@@ -561,7 +561,8 @@ public final class Node implements AutoCloseable
 			endedDial(dialed, admitted);
 			if (peer == null)
 			{
-				// a dialled address that did not complete a handshake is not dialled again
+				// a dialled address that did not complete a handshake waits before it is dialled
+				// again, and counts a failure (#296)
 				dialed.ifPresent(discovery::unreachable);
 			}
 			if (counted == outgoing)
@@ -1081,8 +1082,8 @@ public final class Node implements AutoCloseable
 
 	/**
 	 * An outgoing slot of the zone is free again, as for clearnet peers (#121): an onion address
-	 * that never completed a handshake is forgotten, and peer exchange inside the zone fills the
-	 * slot from the onion addresses it knows
+	 * that never completed a handshake waits and counts a failure (#296), and peer exchange inside
+	 * the zone fills the slot from the onion addresses it knows
 	 */
 	private void refillTheZone(final AnonymityZone anonymous, final PeerAddress dialed,
 		final boolean withoutAHandshake)
@@ -1160,6 +1161,16 @@ public final class Node implements AutoCloseable
 	public List<PeerAddress> heardOf()
 	{
 		return discovery.heardOf();
+	}
+
+	/**
+	 * The clearnet addresses that wait after a failed attempt before they are dialled again (#296)
+	 *
+	 * @return a snapshot
+	 */
+	List<PeerAddress> waitingAddresses()
+	{
+		return discovery.waiting();
 	}
 
 	/**
