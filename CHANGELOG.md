@@ -24,8 +24,11 @@ Unreleased
   ever a success, or after 10 with no success for 24 hours. A further failure counts only once a
   connection to some other address has succeeded since the last one, so an outage on the node's own
   side no longer empties its book. The refusal log says how long the address waits and how many
-  failures it has, instead of forgetting it. No family caller is affected: `PeerBook` and
-  `Discovery` are package-private
+  failures it has, instead of forgetting it. An attempt sets the address's last try when discovery
+  takes the address, so a retry waits again from then: neither a fill running at the same time nor
+  one running before the retry's outcome is recorded dials it a second time, and a failure sets the
+  last try once more, so the pause runs from the failure. A dial this node had no room for gives the
+  last try back. No family caller is affected: `PeerBook` and `Discovery` are package-private
 
 Version 0.9.0
 -------------

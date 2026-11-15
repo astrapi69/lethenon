@@ -37,12 +37,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.IntSupplier;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
@@ -56,7 +60,7 @@ import io.github.astrapi69.lethenon.Bytes;
  * Discovery does not dial an address whose connection is still in its handshake: between the
  * open socket and the added peer, the address is neither dialling nor a peer, and dialling it
  * again opened a second connection to the same node (#117). A dial this node refused for its own
- * limit leaves the address in the book; one that failed forgets it (#126).
+ * limit leaves the address in the book (#126); one that failed keeps it too, and it waits (#296).
  */
 class DiscoveryTest
 {
@@ -273,6 +277,295 @@ class DiscoveryTest
 			assertEquals(Node.MAXIMUM_OUTGOING, outgoing.get(),
 				() -> "outgoing connections, with " + dialled + " dialled");
 			assertEquals(2, dialled.size(), () -> "dialled " + dialled);
+		}
+	}
+
+	/**
+	 * A retry of an address that waited out its pause ends without a handshake, in Node's order
+	 * (Node.serve): the address leaves handshaking in the inner finally, and only the outer finally
+	 * records the failure through unreachable. A fill that runs between the two, as the PEERS
+	 * answer of another peer would, does not take the address again: the retry set its last try
+	 * when it started, and it waits from then (#296). It dialled the address a third time before
+	 */
+	@Test
+	@DisplayName("a retry whose handshake has just ended is not dialled again before its failure is recorded")
+	void aRetryWhoseHandshakeHasJustEnded_isNotDialledAgain_beforeItsFailureIsRecorded()
+		throws Exception
+	{
+		ManualClock clock = new ManualClock();
+		List<PeerAddress> dialled = new CopyOnWriteArrayList<>();
+		Set<PeerAddress> handshaking = ConcurrentHashMap.newKeySet();
+		Discovery.Dialer dialer = handshakingDialer(dialled, handshaking, () -> 0, address -> {
+		});
+		try (ServerSocket server = new ServerSocket(0);
+			Socket ours = new Socket("127.0.0.1", server.getLocalPort());
+			Socket theirs = server.accept())
+		{
+			Discovery discovery = new Discovery(List.of(), new Refusals(), dialer,
+				new OnTheCallingThread(), clock);
+			Peer peer = peerOver(ours);
+			peer.expectPeers();
+			discovery.learn(peer, new PeerList(List.of(NEW)));
+			handshaking.remove(NEW);
+			discovery.unreachable(NEW);
+			clock.advance(PeerBook.FIRST_PAUSE);
+			discovery.fill();
+			assertEquals(List.of(NEW, NEW), dialled, "the retry after the pause");
+
+			handshaking.remove(NEW);
+			discovery.fill();
+
+			assertEquals(List.of(NEW, NEW), dialled,
+				"a fill between the end of the retry's handshake and its recorded failure");
+			assertEquals(List.of(NEW), discovery.waiting(), "waiting before the failure is recorded");
+			discovery.unreachable(NEW);
+			assertEquals(List.of(NEW), discovery.waiting());
+		}
+	}
+
+	/**
+	 * A retry this node had no room for, because a slot was taken between the fill and the dial,
+	 * was not an attempt on the address (#126): it gives back the last try it set, and the address
+	 * is dialled at once when there is room, not a pause later (#296)
+	 */
+	@Test
+	@DisplayName("a retry this node had no room for keeps the address's last try, and it is dialled at once")
+	void aRetryThisNodeHadNoRoomFor_keepsTheLastTry_andIsDialledAtOnce() throws Exception
+	{
+		ManualClock clock = new ManualClock();
+		List<PeerAddress> dialled = new CopyOnWriteArrayList<>();
+		Set<PeerAddress> handshaking = ConcurrentHashMap.newKeySet();
+		AtomicInteger dials = new AtomicInteger();
+		AtomicBoolean full = new AtomicBoolean();
+		Discovery.Dialer dialer = handshakingDialer(dialled, handshaking,
+			() -> full.get() ? Node.MAXIMUM_OUTGOING : 0, address -> {
+				if (dials.incrementAndGet() == 2)
+				{
+					full.set(true);
+					throw new NoRoom("this node has 12 outgoing connections, its limit (ADR 0003)");
+				}
+			});
+		try (ServerSocket server = new ServerSocket(0);
+			Socket ours = new Socket("127.0.0.1", server.getLocalPort());
+			Socket theirs = server.accept())
+		{
+			Discovery discovery = new Discovery(List.of(), new Refusals(), dialer,
+				new OnTheCallingThread(), clock);
+			Peer peer = peerOver(ours);
+			peer.expectPeers();
+			discovery.learn(peer, new PeerList(List.of(NEW)));
+			handshaking.remove(NEW);
+			discovery.unreachable(NEW);
+			clock.advance(PeerBook.FIRST_PAUSE);
+			discovery.fill();
+			assertEquals(List.of(NEW), dialled, "the retry this node had no room for");
+
+			full.set(false);
+			discovery.fill();
+
+			assertEquals(List.of(NEW, NEW), dialled, "the next fill, with room again");
+		}
+	}
+
+	/** What a dial does before it counts as open, or how it is refused */
+	interface BeforeTheSocketOpens
+	{
+		void run(PeerAddress address) throws IOException;
+	}
+
+	/**
+	 * As Node.connect: an address that is not refused is in its handshake once the socket is open,
+	 * which is when dial returns; the test ends the handshake by removing it
+	 */
+	private static Discovery.Dialer handshakingDialer(final List<PeerAddress> dialled,
+		final Set<PeerAddress> handshaking, final IntSupplier outgoing,
+		final BeforeTheSocketOpens before)
+	{
+		return new Discovery.Dialer()
+		{
+			@Override
+			public int outgoing()
+			{
+				return outgoing.getAsInt();
+			}
+
+			@Override
+			public int maximum()
+			{
+				return Node.MAXIMUM_OUTGOING;
+			}
+
+			@Override
+			public void dial(final PeerAddress address) throws IOException
+			{
+				before.run(address);
+				dialled.add(address);
+				handshaking.add(address);
+			}
+
+			@Override
+			public Set<PeerAddress> handshaking()
+			{
+				return Set.copyOf(handshaking);
+			}
+		};
+	}
+
+	/**
+	 * Two fills at once, as the PEERS answers of two peers would run: the second has copied
+	 * dialing, still without the address, when the first takes the address and puts it on dialing.
+	 * The dials are held, so the address stays on dialing. Taking the retry starts its attempt, so
+	 * the second fill finds it waiting and leaves it (#296); it dialled the retry twice before
+	 */
+	@Test
+	@DisplayName("two fills at once take a retry once: the first one starts its attempt")
+	void twoFillsAtOnce_takeARetryOnce() throws Exception
+	{
+		ManualClock clock = new ManualClock();
+		AtomicReference<Thread> secondFill = new AtomicReference<>();
+		CountDownLatch secondCopiedDialing = new CountDownLatch(1);
+		CountDownLatch firstTookTheAddress = new CountDownLatch(1);
+		Discovery.Dialer dialer = new Discovery.Dialer()
+		{
+			@Override
+			public int outgoing()
+			{
+				return 0;
+			}
+
+			@Override
+			public int maximum()
+			{
+				return Node.MAXIMUM_OUTGOING;
+			}
+
+			@Override
+			public void dial(final PeerAddress address)
+			{
+			}
+
+			/** Discovery.busy() copies dialing first and asks for the handshakes after */
+			@Override
+			public Set<PeerAddress> handshaking()
+			{
+				if (Thread.currentThread() == secondFill.get() && secondCopiedDialing.getCount() > 0)
+				{
+					secondCopiedDialing.countDown();
+					awaitLatch(firstTookTheAddress);
+				}
+				return Set.of();
+			}
+		};
+		HoldsEveryDial threads = new HoldsEveryDial();
+		try (ServerSocket server = new ServerSocket(0);
+			Socket ours = new Socket("127.0.0.1", server.getLocalPort());
+			Socket theirs = server.accept())
+		{
+			Discovery discovery = new Discovery(List.of(), new Refusals(), dialer, threads, clock);
+			Peer peer = peerOver(ours);
+			peer.expectPeers();
+			discovery.dialling(false);
+			discovery.learn(peer, new PeerList(List.of(NEW)));
+			discovery.unreachable(NEW);
+			clock.advance(PeerBook.FIRST_PAUSE);
+			discovery.dialling(true);
+			Thread second = Thread.ofPlatform().unstarted(discovery::fill);
+			secondFill.set(second);
+			second.start();
+			awaitLatch(secondCopiedDialing);
+
+			discovery.fill();
+			firstTookTheAddress.countDown();
+			second.join(TimeUnit.SECONDS.toMillis(10));
+
+			assertEquals(1, threads.held(), "dials of " + NEW + " submitted");
+		}
+	}
+
+	/** Holds every dial submitted to it, so that the address stays on dialing, and counts them */
+	private static final class HoldsEveryDial extends AbstractExecutorService
+	{
+
+		private final AtomicInteger held = new AtomicInteger();
+
+		@Override
+		public void execute(final Runnable dial)
+		{
+			held.incrementAndGet();
+		}
+
+		int held()
+		{
+			return held.get();
+		}
+
+		@Override
+		public void shutdown()
+		{
+		}
+
+		@Override
+		public List<Runnable> shutdownNow()
+		{
+			return List.of();
+		}
+
+		@Override
+		public boolean isShutdown()
+		{
+			return false;
+		}
+
+		@Override
+		public boolean isTerminated()
+		{
+			return true;
+		}
+
+		@Override
+		public boolean awaitTermination(final long timeout, final TimeUnit unit)
+		{
+			return true;
+		}
+	}
+
+	/** Runs each dial on the thread that submits it, so that the order of a test is the order run */
+	private static final class OnTheCallingThread extends AbstractExecutorService
+	{
+
+		@Override
+		public void execute(final Runnable task)
+		{
+			task.run();
+		}
+
+		@Override
+		public void shutdown()
+		{
+		}
+
+		@Override
+		public List<Runnable> shutdownNow()
+		{
+			return List.of();
+		}
+
+		@Override
+		public boolean isShutdown()
+		{
+			return false;
+		}
+
+		@Override
+		public boolean isTerminated()
+		{
+			return false;
+		}
+
+		@Override
+		public boolean awaitTermination(final long timeout, final TimeUnit unit)
+		{
+			return true;
 		}
 	}
 
