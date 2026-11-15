@@ -33,10 +33,12 @@ import static io.github.astrapi69.lethenon.transport.Networks.testGenesis;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -185,6 +187,63 @@ class FailedDialTest
 				socket.close();
 			}
 		}
+	}
+
+	/**
+	 * A dialled peer counts among the newcomer's peers from its admission, and its address leaves
+	 * the addresses heard of only afterwards, when discovery confirms it (Node.serve: admit, then
+	 * Discovery.connected). The test holds the newcomer's address book while the far end says
+	 * HELLO, which stops the connection's thread at the confirmation: the peer stands, and its
+	 * address is still heard of. A test that reads the addresses heard of the moment the peers
+	 * stand can read this state, which is what made the two tests above fail under load (#325)
+	 */
+	@Test
+	@DisplayName("a dialled peer counts among the peers before its address leaves the addresses heard of")
+	void aDialledPeer_countsBeforeItsAddressLeavesTheAddressesHeardOf() throws Exception
+	{
+		List<Socket> held = new CopyOnWriteArrayList<>();
+		try (Node hub = Node.on(genesis).discoverPeers(false).keepingLocalAddresses();
+			Node newcomer = Node.on(genesis).keepingLocalAddresses();
+			ServerSocket answering = silent(held))
+		{
+			int hubPort = hub.listen(0);
+			PeerAddress address = new PeerAddress("127.0.0.1", answering.getLocalPort());
+			try (Socket announcing = announcedAtTheHub(genesis, hubPort, address.port()))
+			{
+				newcomer.connect("127.0.0.1", hubPort);
+				await(() -> "the newcomer in its handshake with " + address + "; refusals "
+					+ newcomer.refusals(),
+					() -> !held.isEmpty() && newcomer.handshakingAddresses().contains(address));
+
+				List<PeerAddress> heardOfWhenItStood;
+				synchronized (addressBookOf(newcomer, false))
+				{
+					sayHello(held.get(0), address.port());
+					await(() -> "the dialled peer admitted; peers " + newcomer.peers().size()
+						+ ", refusals " + newcomer.refusals(), () -> newcomer.peers().size() == 2);
+					heardOfWhenItStood = newcomer.heardOf();
+				}
+
+				await(() -> "its address confirmed; heard of " + newcomer.heardOf(),
+					() -> !newcomer.heardOf().contains(address));
+				assertEquals(List.of(address), heardOfWhenItStood,
+					"heard of when the dialled peer stood among the peers");
+			}
+		}
+		finally
+		{
+			for (Socket socket : held)
+			{
+				socket.close();
+			}
+		}
+	}
+
+	/** The far end's HELLO, as a node on this chain that listens on the given port says it */
+	private void sayHello(final Socket farEnd, final int listening) throws IOException
+	{
+		Frames.write(new DataOutputStream(farEnd.getOutputStream()), new Frame(MessageType.HELLO,
+			Hello.of(genesis, listening, new SecureRandom().nextLong(1, Long.MAX_VALUE)).encode()));
 	}
 
 	/**
