@@ -41,11 +41,16 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -77,6 +82,12 @@ public final class Node implements AutoCloseable
 	/** How long a peer has to say HELLO: Monero's handshake timeout of 5000 ms (ADR 0003) */
 	public static final int HANDSHAKE_MILLIS = 5_000;
 
+	/**
+	 * How long {@link #close()} waits for the threads that accept on its listeners to end (#325);
+	 * on loopback they end within milliseconds
+	 */
+	static final long LISTENER_CLOSE_MILLIS = 5_000;
+
 	/** How long a request may wait for its answer: Monero's two-minute invoke timeout (ADR 0003) */
 	public static final int ANSWER_MILLIS = 120_000;
 
@@ -105,6 +116,12 @@ public final class Node implements AutoCloseable
 	private final List<Socket> open = new CopyOnWriteArrayList<>();
 
 	private final ExecutorService threads = Executors.newVirtualThreadPerTaskExecutor();
+
+	/**
+	 * The accepting threads of the listeners, which {@link #close()} waits for: the JDK finishes
+	 * closing a listener on the thread that accepts on it (#325)
+	 */
+	private final List<Future<?>> accepting = new CopyOnWriteArrayList<>();
 
 	private final LocalChain local;
 
@@ -797,7 +814,7 @@ public final class Node implements AutoCloseable
 		socket.bind(new InetSocketAddress(bind, port));
 		server = socket;
 		listenPort = socket.getLocalPort();
-		threads.submit(this::accept);
+		accepting.add(threads.submit(this::accept));
 		return listenPort;
 	}
 
@@ -936,7 +953,7 @@ public final class Node implements AutoCloseable
 		socket.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), localPort));
 		anonymousServer = socket;
 		announcedOnion = onion;
-		threads.submit(() -> acceptAnonymously(anonymous, socket, maximum));
+		accepting.add(threads.submit(() -> acceptAnonymously(anonymous, socket, maximum)));
 		return socket.getLocalPort();
 	}
 
@@ -1301,7 +1318,11 @@ public final class Node implements AutoCloseable
 	}
 
 	/**
-	 * Stops listening, closes every connection and its thread
+	 * Stops listening, closes every connection and its thread. It returns once the node's ports no
+	 * longer take a connection: ServerSocket.close() returns before that while a thread accepts on
+	 * the listener, the JDK finishes the close on the accepting thread, and until then the port
+	 * completes handshakes into its backlog and resets them afterwards (#325). So close() waits for
+	 * the accepting threads to end, at most five seconds
 	 */
 	@Override
 	public void close()
@@ -1315,11 +1336,43 @@ public final class Node implements AutoCloseable
 		{
 			closeQuietly(anonymousServer);
 		}
+		awaitTheAcceptingThreads();
 		for (Socket socket : open)
 		{
 			closeQuietly(socket);
 		}
 		threads.shutdownNow();
+	}
+
+	/**
+	 * Waits until every accepting thread has ended, which is when the JDK has closed its listener;
+	 * one that has not ended within {@code LISTENER_CLOSE_MILLIS} is recorded as a refusal
+	 */
+	private void awaitTheAcceptingThreads()
+	{
+		long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(LISTENER_CLOSE_MILLIS);
+		for (Future<?> thread : accepting)
+		{
+			try
+			{
+				thread.get(Math.max(0L, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+			}
+			catch (ExecutionException | CancellationException ended)
+			{
+				// the thread ended, though not by returning: ended is what is waited for
+			}
+			catch (TimeoutException stillAccepting)
+			{
+				refusals.add("a listener of this node was still accepting " + LISTENER_CLOSE_MILLIS
+					+ " ms after close(); its port may take a connection a moment longer (#325)");
+				return;
+			}
+			catch (InterruptedException interrupted)
+			{
+				Thread.currentThread().interrupt();
+				return;
+			}
+		}
 	}
 
 	private static void closeQuietly(final java.io.Closeable closeable)

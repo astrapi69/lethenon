@@ -24,6 +24,7 @@
  */
 package io.github.astrapi69.lethenon.transport;
 
+import static io.github.astrapi69.lethenon.transport.Networks.await;
 import static io.github.astrapi69.lethenon.transport.Networks.testGenesis;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -517,6 +518,244 @@ class DiscoveryTest
 			second.join(TimeUnit.SECONDS.toMillis(10));
 			assertFalse(first.isAlive() || second.isAlive(), "a fill did not end");
 			return threads.held();
+		}
+	}
+
+	/**
+	 * Two fills at once for the last free slot dial once: the room is counted inside the locked
+	 * step that takes the address, dialing before the outgoing connections, so the first fill
+	 * waits until the second has taken the address and then finds no room (#325). Before, the
+	 * second fill read the count, the first took an address and dialled it, and the second added a
+	 * dialing that no longer held it to a count that did not hold it yet and took a second address
+	 * for a slot that was gone: Node.connect refused it for the node's own limit, and the address
+	 * stayed undialled while the node was full, the third way FailedDialTest failed under load
+	 */
+	@Test
+	@DisplayName("two fills at once for the last free slot dial once")
+	void twoFillsAtOnce_forTheLastFreeSlot_dialOnce() throws Exception
+	{
+		assertEquals(1, dialsForTheLastFreeSlot(), "dials for one free slot");
+	}
+
+	/**
+	 * A dial under way while the room is counted is counted once, whichever way it moves
+	 * meanwhile: dialing is read before the outgoing connections, and a dial counts as outgoing
+	 * before it leaves dialing (#325). The node has one slot left and a dial under way for it;
+	 * while a fill reads the count of outgoing connections, that dial counts itself and leaves
+	 * dialing. Read the other way round, the fill missed it and took a second address for a slot
+	 * that was gone
+	 */
+	@Test
+	@DisplayName("a dial that moves while the room is counted is counted once")
+	void aDialThatMovesWhileTheRoomIsCounted_isCountedOnce() throws Exception
+	{
+		AtomicInteger outgoing = new AtomicInteger(Node.MAXIMUM_OUTGOING - 1);
+		List<PeerAddress> dialled = new CopyOnWriteArrayList<>();
+		CountDownLatch letTheDialMove = new CountDownLatch(1);
+		AtomicReference<Thread> counting = new AtomicReference<>();
+		AtomicReference<Thread> dialThread = new AtomicReference<>();
+		Discovery.Dialer dialer = new Discovery.Dialer()
+		{
+			/** While the fill counts, the dial under way counts itself and leaves dialing */
+			@Override
+			public int outgoing()
+			{
+				int count = outgoing.get();
+				if (counting.compareAndSet(Thread.currentThread(), null))
+				{
+					letTheDialMove.countDown();
+					awaitBlockedOn(dialThread.get(), Thread.currentThread());
+				}
+				return count;
+			}
+
+			@Override
+			public int maximum()
+			{
+				return Node.MAXIMUM_OUTGOING;
+			}
+
+			/** As Node.connect: the slot counts from the dial on */
+			@Override
+			public void dial(final PeerAddress address)
+			{
+				if (dialThread.compareAndSet(null, Thread.currentThread()))
+				{
+					awaitLatch(letTheDialMove);
+				}
+				outgoing.incrementAndGet();
+				dialled.add(address);
+			}
+
+			@Override
+			public Set<PeerAddress> handshaking()
+			{
+				return Set.copyOf(dialled);
+			}
+		};
+		OnPlatformThreads threads = new OnPlatformThreads();
+		try (ServerSocket server = new ServerSocket(0);
+			Socket ours = new Socket("127.0.0.1", server.getLocalPort());
+			Socket theirs = server.accept())
+		{
+			Discovery discovery = new Discovery(List.of(), new Refusals(), dialer, threads);
+			Peer peer = peerOver(ours);
+			peer.expectPeers();
+			discovery.dialling(false);
+			discovery.learn(peer, new PeerList(List.of(NEW, ANOTHER)));
+			discovery.dialling(true);
+			discovery.fill();
+			await("the dial under way", () -> dialThread.get() != null);
+
+			counting.set(Thread.currentThread());
+			discovery.fill();
+			threads.awaitFinished();
+
+			assertEquals(List.of(NEW), dialled, "dialled for one free slot");
+		}
+	}
+
+	/**
+	 * Waits until the thread is blocked on a lock the holder holds, which here is the moment a
+	 * finished dial waits to fill again behind the counting fill
+	 */
+	private static void awaitBlockedOn(final Thread thread, final Thread holder)
+	{
+		ThreadMXBean threads = ManagementFactory.getThreadMXBean();
+		await("the dial blocked on the counting fill's lock", () -> {
+			ThreadInfo state = threads.getThreadInfo(thread.threadId());
+			return state != null && state.getLockOwnerId() == holder.threadId();
+		});
+	}
+
+	/** Runs each dial on a platform thread of its own, which ThreadMXBean can see */
+	private static final class OnPlatformThreads extends AbstractExecutorService
+	{
+
+		private final List<Thread> started = new CopyOnWriteArrayList<>();
+
+		@Override
+		public void execute(final Runnable task)
+		{
+			started.add(Thread.ofPlatform().start(task));
+		}
+
+		/** Waits for every dial, those a dial started included */
+		void awaitFinished() throws InterruptedException
+		{
+			for (int index = 0; index < started.size(); index++)
+			{
+				started.get(index).join(TimeUnit.SECONDS.toMillis(10));
+			}
+		}
+
+		@Override
+		public void shutdown()
+		{
+		}
+
+		@Override
+		public List<Runnable> shutdownNow()
+		{
+			return List.of();
+		}
+
+		@Override
+		public boolean isShutdown()
+		{
+			return false;
+		}
+
+		@Override
+		public boolean isTerminated()
+		{
+			return started.stream().noneMatch(Thread::isAlive);
+		}
+
+		@Override
+		public boolean awaitTermination(final long timeout, final TimeUnit unit)
+			throws InterruptedException
+		{
+			awaitFinished();
+			return isTerminated();
+		}
+	}
+
+	/**
+	 * Runs two fills at once while one slot is free, the first dialling on its own thread as soon
+	 * as it takes an address, and counts the dials
+	 */
+	private int dialsForTheLastFreeSlot() throws Exception
+	{
+		AtomicInteger outgoing = new AtomicInteger(Node.MAXIMUM_OUTGOING - 1);
+		List<PeerAddress> dialled = new CopyOnWriteArrayList<>();
+		AtomicReference<Thread> firstFill = new AtomicReference<>();
+		AtomicReference<Thread> secondFill = new AtomicReference<>();
+		CountDownLatch secondReadTheCount = new CountDownLatch(1);
+		CountDownLatch firstDialled = new CountDownLatch(1);
+		Discovery.Dialer dialer = new Discovery.Dialer()
+		{
+			/** The second fill reads the count, then waits before it goes on with it */
+			@Override
+			public int outgoing()
+			{
+				int count = outgoing.get();
+				if (Thread.currentThread() == secondFill.get() && secondReadTheCount.getCount() > 0)
+				{
+					secondReadTheCount.countDown();
+					letTheFirstFillGo(firstFill, firstDialled);
+				}
+				return count;
+			}
+
+			@Override
+			public int maximum()
+			{
+				return Node.MAXIMUM_OUTGOING;
+			}
+
+			/** As Node.connect: the slot counts from the dial on */
+			@Override
+			public void dial(final PeerAddress address)
+			{
+				outgoing.incrementAndGet();
+				dialled.add(address);
+				if (Thread.currentThread() == firstFill.get())
+				{
+					firstDialled.countDown();
+				}
+			}
+
+			/** A dialled address is connected, and so busy */
+			@Override
+			public Set<PeerAddress> handshaking()
+			{
+				return Set.copyOf(dialled);
+			}
+		};
+		try (ServerSocket server = new ServerSocket(0);
+			Socket ours = new Socket("127.0.0.1", server.getLocalPort());
+			Socket theirs = server.accept())
+		{
+			Discovery discovery = new Discovery(List.of(), new Refusals(), dialer,
+				new OnTheCallingThread());
+			Peer peer = peerOver(ours);
+			peer.expectPeers();
+			discovery.dialling(false);
+			discovery.learn(peer, new PeerList(List.of(NEW, ANOTHER)));
+			discovery.dialling(true);
+			Thread second = Thread.ofPlatform().name("second fill").unstarted(discovery::fill);
+			secondFill.set(second);
+			second.start();
+			awaitLatch(secondReadTheCount);
+			Thread first = Thread.ofPlatform().name("first fill").unstarted(discovery::fill);
+			firstFill.set(first);
+			first.start();
+
+			first.join(TimeUnit.SECONDS.toMillis(10));
+			second.join(TimeUnit.SECONDS.toMillis(10));
+			assertFalse(first.isAlive() || second.isAlive(), "a fill did not end");
+			return dialled.size();
 		}
 	}
 
