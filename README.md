@@ -350,7 +350,7 @@ with tests.
 ## Donations
 
 If you like this project, a donation goes through
-[PayPal](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=B37J9DZF6G9ZC).
+[PayPal](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=MJ7V43GU2H386).
 
 The cryptocurrency donation addresses that used to stand here are deliberately gone from this one
 repository: on a project that is itself a coin, an address in the README reads like a way to buy
